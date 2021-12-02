@@ -124,7 +124,7 @@ class Laser(arcade.Sprite):
         super().__init__(filename=image, scale=scale, center_x=x, center_y=y,
                          angle=angle)
 
-        self.speed = 500
+        self.speed = 200
 
         # Set direction angle
         self.change_x = -math.sin(math.radians(self.angle))
@@ -157,40 +157,149 @@ class Meteor(arcade.Sprite):
         self.target_x = SCREEN_WIDTH / 2
         self.target_y = SCREEN_HEIGHT / 2
 
+        # TODO: DON'T THINK I NEED THESE HERE -- INHERITED?
+        # Amount to change x and y to move in straight line to target
+        self.change_x = 0
+        self.change_y = 0
+
+        # Set spinning at random rate
+        self.change_angle = 0
+
+        # Largest measurement. Used to determine if can be seen offscreen at
+        # any angle
+        self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
+
+        # # Whether visible based on location (not alpha, like visible)
+        # self.on_screen = False
+
     def on_update(self, delta_time: float = 1 / 60):
-        """
-        This version makes meteors move in straight-ish lines, not go directly
-        toward the player.
-        """
-        # Move to target if within range, otherwise move towards target
+
+        # Get x and y distance to target from current position
+        x_distance = self.target_x - self.center_x
+        y_distance = self.target_y - self.center_y
+
+        # No need to move if already at target point
+        if x_distance == 0 and y_distance == 0:
+            return
+
+        # Angle between -pi and pi, formed by pos x axis and vector to target
+        # Handles situations that would raise ZeroDivisionError with math.tan
+        angle_rad = math.atan2(y_distance, x_distance)
+
+        # Since angle's initial side is pos x axis, use normal trig functions
+        # to find changes in x and y
+        self.change_x = math.cos(angle_rad)
+        self.change_y = math.sin(angle_rad)
 
         # Set new center_x
-        x_distance = self.target_x - self.center_x
-        if abs(x_distance) <= self.speed * delta_time:
+        # Move to target if within range, otherwise move towards target
+        self.change_x *= self.speed * delta_time
+        if abs(x_distance) <= self.change_x:
             self.center_x = self.target_x
         else:
-            # If the target is greater than the current position, then
-            # dividing distance by abs(distance) gives 1. If the target is
-            # less than the current position, dividing by abs(distance) will
-            # give negative 1.
-            direction = x_distance / abs(x_distance)
-            self.center_x += direction * self.speed * delta_time
+            self.center_x += self.change_x
 
         # Set new center_y
-        y_distance = self.target_y - self.center_y
-        if abs(y_distance) <= self.speed * delta_time:
+        self.change_y *= self.speed * delta_time
+        if abs(y_distance) <= self.change_y:
             self.center_y = self.target_y
         else:
-            # If the target is greater than the current position, then
-            # dividing distance by abs(distance) gives 1. If the target is
-            # less than the current position, dividing by abs(distance) will
-            # give negative 1.
-            direction = y_distance / abs(y_distance)
-            self.center_y += direction * self.speed * delta_time
+            self.center_y += self.change_y
+
+        # Spin meteor
+        self.angle += self.change_angle
+
+        # # TODO: Is there a way to make this less expensive? seems costly
+        # # Set whether or not visible based on location (not alpha)
+        # if (self.center_x < -self.diagonal // 2
+        #         or self.center_x > SCREEN_WIDTH + self.diagonal // 2):
+        #     self.on_screen = False
+        # # Only need to check y-based visibility if could be visible based on x
+        # elif (self.center_y < -self.diagonal // 2
+        #         or self.center_y > SCREEN_HEIGHT + self.diagonal // 2):
+        #     self.on_screen = False
+        # else:
+        #     self.on_screen = True
+
+        # Don't need above code, just check whether target x is same as center
+        # Eliminate meteors once they disappear offscreen
+        if self.center_x == self.target_x and self.center_y == self.target_y:
+            self.remove_from_sprite_lists()
+
+    # TODO: DELETE (JUST FOR DEBUGGING)
+    def __repr__(self):
+        return ("Meteor: center_x = {}, center_y = {}, speed = {}, "
+                "target_x = {}, target_y = {}, change_x = {},"
+                " change_y = {}".format(self.center_x, self.center_y,
+                                        self.speed, self.target_x,
+                                        self.target_y, self.change_x,
+                                        self.change_y))
+
+
+class EnemyShip(arcade.Sprite):
+    def __init__(self, image, scale=IMAGE_SCALE):
+        super().__init__(filename=image, scale=scale)
+
+        # Initialize speed to not moving
+        self.speed = 0
+
+        # Initialize target point to center of screen
+        self.target_x = SCREEN_WIDTH / 2
+        self.target_y = SCREEN_HEIGHT / 2
+
+        # TODO: DON'T THINK I NEED THESE HERE -- INHERITED?
+        # Amount to change x and y to move in straight line to target
+        self.change_x = 0
+        self.change_y = 0
+
+        # Largest measurement. Used to determine if can be seen offscreen at
+        # any angle
+        self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
+
+    def on_update(self, delta_time: float = 1/60):
+        # Get x and y distance to target from current position
+        x_distance = self.target_x - self.center_x
+        y_distance = self.target_y - self.center_y
+
+        # No need to move if already at target point
+        if x_distance == 0 and y_distance == 0:
+            return
+
+        # Angle between -pi and pi, formed by pos x axis and vector to target
+        # Handles situations that would raise ZeroDivisionError with math.tan
+        angle_rad = math.atan2(y_distance, x_distance)
+
+        # Set angle of ship to match angle of movement
+        # angle_rad is the measured from the positive x axis, but image
+        # angles are measured from the positive y axis
+        self.angle = math.degrees(angle_rad) + 90
+
+        # Since angle's initial side is pos x axis, use normal trig functions
+        # to find changes in x and y
+        self.change_x = math.cos(angle_rad)
+        self.change_y = math.sin(angle_rad)
+
+        # Set new center_x
+        # Move to target if within range, otherwise move towards target
+        self.change_x *= self.speed * delta_time
+        if abs(x_distance) <= self.change_x:
+            self.center_x = self.target_x
+        else:
+            self.center_x += self.change_x
+
+        # Set new center_y
+        self.change_y *= self.speed * delta_time
+        if abs(y_distance) <= self.change_y:
+            self.center_y = self.target_y
+        else:
+            self.center_y += self.change_y
 
     def set_target(self, x, y):
         self.target_x = x
         self.target_y = y
+
+
+
 
 
 class MyGameWindow(arcade.Window):
@@ -216,10 +325,6 @@ class MyGameWindow(arcade.Window):
 
         arcade.set_background_color((0, 0, 0))
 
-        # Radius of circumscribed circle describes farthest possible visible
-        # point
-        self.circumscribed = ((width ** 2) + (height ** 2)) ** .5
-
         # Start at level 1
         self.level = 1
 
@@ -242,11 +347,19 @@ class MyGameWindow(arcade.Window):
             self.meteor_images.append(meteor_base_name.format(
                 "tiny{}".format(i)))
 
+        # List of enemy ship images
+        self.enemy_ship_images = ["spaceshooter/PNG/Enemies/enemyRed1.png",
+                                  "spaceshooter/PNG/Enemies/enemyRed2.png"]
+
         self.player_sprite = None
         self.player_list = None
 
-        self.laser_list = None
+        self.player_laser_list = None
+
         self.meteor_list = None
+
+        self.enemy_list = None
+        self.enemy_laser_list = None
 
         # Key press info
         self.left_pressed = False
@@ -278,49 +391,54 @@ class MyGameWindow(arcade.Window):
         self.player_list = arcade.SpriteList()
         self.player_list.append(self.player_sprite)
 
-        self.laser_list = arcade.SpriteList()
+        self.player_laser_list = arcade.SpriteList()
 
         self.meteor_list = arcade.SpriteList()
 
+        self.enemy_list = arcade.SpriteList()
+        self.enemy_laser_list = arcade.SpriteList()
+
+        # TODO: MAKE NUMBER AND SPEED DEPENDENT ON LEVEL
         # Number of meteors depends upon level
-        self.make_meteors(10, (50, 200))
+        self.make_meteors(10, (50, 200))    # TODO: undo numbers
+
+        # Number of meteors depends upon level
+        self.make_enemy_ships(10, (50, 200))
 
     def make_meteors(self, num_meteors, speed_range):
-        for i in range(num_meteors):
+
+        # TODO: Start them way closer to edge of screen
+        for i in range(num_meteors + 1):
             self.meteor_list.append(Meteor(random.choice(self.meteor_images)))
-            # Get diagonal size of meteor to hide it offscreen
-            diagonal = int((self.meteor_list[-1].width ** 2
-                            + self.meteor_list[-1].height ** 2) ** .5)
 
             # Get coordinates of random point offscreen by getting a random
             # x and a corresponding y that makes it work
-            x = random.randrange(-1 * SCREEN_WIDTH, 2 * SCREEN_WIDTH)
+            diagonal = self.meteor_list[-1].diagonal
 
-            # To make sure meteors always start offscreen, the meteor's
-            # center must be at least [the radius of the circumscribed
-            # circle + the diagonal of the meteor] away from the center of
-            # the screen
+            # x can be anywhere in the width of the screen, and a little to
+            # the left or right
+            x = random.randrange(SCREEN_WIDTH // -2, 3 * SCREEN_WIDTH // 2)
 
-            # TODO: COMPLEX NUM ISSUE
-            try:
-                y_min = int(((self.circumscribed + diagonal) ** 2 - (x ** 2))
-                            ** .5)
-            except TypeError:
-                # If x is bigger than self.circumscribed + diagonal, y_min
-                # would be a complex number, which int() can't convert
-                # In that case, y can be any real number, since the x-value
-                # puts the meteor offscreen anyway
-                y_min = 0
+            # If x coordinate is within range of visible x's, place
+            # y-coordinate offscreen
+            if -diagonal // 2 <= x <= SCREEN_WIDTH + diagonal // 2:
 
-            # Randomly pick whether y will be positive or negative
-            y_sign = random.choice([1, -1])
+                # Whether y will be above or below screen
+                y_sign = random.choice([1, -1])
 
-            # Second parameter to random.randrange() must be larger than
-            # than the first, unless the step is set. Account for instance
-            # when x-value is very low so y_min may be larger than 2 *
-            # SCREEN_HEIGHT
-            y_max = max(2 * SCREEN_HEIGHT, 2 * y_min)
-            y = y_sign * random.randrange(y_min, y_max)
+                # How far away from edge of screen y will be
+                y_offset = random.randrange(diagonal, 5 * diagonal)
+
+                # Place y above or below edge of screen
+                if y_sign > 0:
+                    y = SCREEN_HEIGHT + y_offset
+                else:
+                    y = -y_offset
+
+            # If x-coordinate is offscreen, place y-coordinate within,
+            # range of visible y-coordinates, or a little beyond
+            else:
+                y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
 
             # Set coordinates of meteor
             self.meteor_list[-1].center_x = x
@@ -330,18 +448,94 @@ class MyGameWindow(arcade.Window):
             self.meteor_list[-1].speed = random.randrange(speed_range[0],
                                                           speed_range[1])
 
+            # Set random spin rate for meteor, avoiding zero
+            self.meteor_list[-1].change_angle = random.randrange(-5, 6, 2)
+
+            # Set random target point for meteor across screen
+
+            #
+            if x < 0:
+                target_x = SCREEN_WIDTH + diagonal
+            elif x > SCREEN_WIDTH:
+                target_x = -diagonal
+            else:
+                target_x = random.randrange(SCREEN_WIDTH)
+
+            #
+            if y < 0:
+                target_y = SCREEN_HEIGHT + diagonal
+            elif y > SCREEN_HEIGHT:
+                target_y = -diagonal
+            else:
+                target_y = random.randrange(SCREEN_HEIGHT)
+
+            self.meteor_list[-1].target_x = target_x
+            self.meteor_list[-1].target_y = target_y
+
+
+
+
+    # TODO: THIS IS THE SAME AS MAKE_METEORS SO MAKE AS ONE FUNCTION
+    def make_enemy_ships(self, num_enemies, speed_range):
+
+        # TODO: Start them way closer to edge of screen
+        for i in range(num_enemies + 1):
+            self.enemy_list.append(EnemyShip(self.enemy_ship_images[0]))
+
+            # Get diagonal size of enemy_ship to hide it offscreen
+            diagonal = self.enemy_list[-1].diagonal
+
+            # Get coordinates of random point offscreen by getting a random
+            # x and a corresponding y that makes it work
+
+            # x can be anywhere in the width of the screen, and a little to
+            # the left or right
+            x = random.randrange(SCREEN_WIDTH // -2, 3 * SCREEN_WIDTH // 2)
+
+            # If x coordinate is within range of visible x's, place
+            # y-coordinate offscreen
+            if -diagonal // 2 <= x <= SCREEN_WIDTH + diagonal // 2:
+
+                # Whether y will be above or below screen
+                y_sign = random.choice([1, -1])
+
+                # How far away from edge of screen y will be
+                y_offset = random.randrange(diagonal, 5 * diagonal)
+
+                # Place y above or below edge of screen
+                if y_sign > 0:
+                    y = SCREEN_HEIGHT + y_offset
+                else:
+                    y = -y_offset
+
+            # If x-coordinate is offscreen, place y-coordinate within,
+            # range of visible y-coordinates, or a little beyond
+            else:
+                y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
+
+            # Set coordinates of meteor
+            self.enemy_list[-1].center_x = x
+            self.enemy_list[-1].center_y = y
+
+            # Set random speed of meteor within range
+            self.enemy_list[-1].speed = random.randrange(speed_range[0],
+                                                          speed_range[1])
+
 
     def on_draw(self):
         arcade.start_render()
 
-        # Draw lasers first so covered by player and look like they're growing
+        # Draw player_lasers first so covered by player and look like they're growing
         # out from space ship
-        self.laser_list.draw()
+        self.player_laser_list.draw()
         self.player_list.draw()
 
         # Drawing with SpriteList means anything outside the viewport won't
         # be drawn
         self.meteor_list.draw()
+
+        self.enemy_list.draw()
+        self.enemy_laser_list.draw()
 
     def on_update(self, delta_time):
         """
@@ -367,18 +561,18 @@ class MyGameWindow(arcade.Window):
         if self.down_pressed and not self.up_pressed:
             self.player_sprite.speed = -self.player_sprite.forward_rate
 
-        # Shoot lasers periodically while space is pressed
+        # Shoot player_lasers periodically while space is pressed
         self.reloading -= 1
         if self.space_pressed and self.reloading <= 0:
-            self.laser_list.append(Laser(self.player_sprite.center_x,
-                                         self.player_sprite.center_y,
-                                         angle=self.player_sprite.angle))
+            self.player_laser_list.append(Laser(self.player_sprite.center_x,
+                                                self.player_sprite.center_y,
+                                                angle=self.player_sprite.angle))
             # Slow enough reload time that player could do it faster by
             # repeatedly hitting space, but fast enough to be fun
             self.reloading = 10
 
-        # Fade lasers out after firing
-        for laser in self.laser_list:
+        # Fade player_lasers out after firing
+        for laser in self.player_laser_list:
             # TODO: Is this an okay use of try-except?
             if laser.frames > 60:
                 try:
@@ -388,20 +582,26 @@ class MyGameWindow(arcade.Window):
             elif laser.frames > 50:
                 laser.alpha -= 10
 
-        # Set meteor's new target point as player's current (soon-to-be-old)
+        # Set enemies' new target point as player's current (soon-to-be-old)
         # location
-        for meteor in self.meteor_list:
-            meteor.set_target(self.player_sprite.center_x,
-                              self.player_sprite.center_y)
+        for enemy in self.enemy_list:
+            enemy.set_target(self.player_sprite.center_x,
+                             self.player_sprite.center_y)
 
         self.player_list.on_update(delta_time)
-        self.laser_list.on_update(delta_time)
+        self.player_laser_list.on_update(delta_time)
         self.meteor_list.on_update(delta_time)
+        self.enemy_list.on_update(delta_time)
+        self.enemy_laser_list.on_update(delta_time)
 
     def on_key_press(self, symbol, modifiers):
         # Gracefully quit program
         if symbol == arcade.key.W and modifiers == arcade.key.MOD_COMMAND:
             arcade.close_window()
+
+        # Restart program
+        if symbol == arcade.key.R and modifiers == arcade.key.MOD_COMMAND:
+            self.setup()
 
         if symbol == arcade.key.RIGHT:
             self.right_pressed = True
@@ -416,13 +616,15 @@ class MyGameWindow(arcade.Window):
             self.space_pressed = True
 
         # TODO: DELETE -- JUST USED FOR DEBUGGING
-        for meteor in self.meteor_list:
-            print("{}, {}\n{}, {}\n{}\n".format(meteor.center_x,
-                                                meteor.center_y,
-                                                meteor.target_x,
-                                                meteor.target_y,
-                                                meteor.speed))
-        print("-" * 50)
+        if symbol == arcade.key.P:
+            for meteor in self.meteor_list:
+                # print("{}, {}\n{}, {}\n{}\n".format(meteor.center_x,
+                #                                     meteor.center_y,
+                #                                     meteor.target_x,
+                #                                     meteor.target_y,
+                #                                     meteor.speed))
+                print(meteor)
+            print("-" * 50)
 
     def on_key_release(self, symbol, modifiers):
 
