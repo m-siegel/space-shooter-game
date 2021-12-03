@@ -13,7 +13,6 @@ Practice:
     - spawning (already done, but can check how they do)
 
 TODO:
-    - add enemy lasers
     - add collision between player lasers and meteors, player lasers and
         enemy ships
     - add collision between enemy lasers and player ship
@@ -28,6 +27,10 @@ TODO:
     - add start screen
     - add end screen
     - add a compass so player can see where they're facing
+
+DONE:
+    - add enemy lasers
+
 """
 
 
@@ -42,6 +45,9 @@ SCREEN_TITLE = "Space Shooter"
 
 # TODO: put this laser_image just within player
 LASER_IMAGE = "spaceshooter/PNG/Lasers/laserBlue01.png"
+
+METEOR_POINTS = 5
+ENEMY_POINTS = 15
 
 IMAGE_SCALE = .5
 
@@ -382,6 +388,12 @@ class MyGameWindow(arcade.Window):
         # Start at level 1
         self.level = 1
 
+        # Start with 0 points
+        self.points = 0
+
+        # Lives TODO: IDK if this should go here or in player
+        self.lives = 3
+
         # Player ships to change each level
         self.ships = ["spaceshooter/PNG/Player_ships/playerShip1_blue.png",
                       "spaceshooter/PNG/Player_ships/playerShip2_blue.png",
@@ -405,6 +417,7 @@ class MyGameWindow(arcade.Window):
         self.enemy_ship_images = ["spaceshooter/PNG/Enemies/enemyRed1.png",
                                   "spaceshooter/PNG/Enemies/enemyRed2.png"]
 
+        # TODO: WHY HAVE A PLAYER SPRITE LIST?
         self.player_sprite = None
         self.player_list = None
 
@@ -604,6 +617,73 @@ class MyGameWindow(arcade.Window):
         :return:
         """
 
+        # Check collisions first because we'll delete sprites based on these
+        # collisions and want them to have visually overlapped in the last
+        # frame before deleting them. If we deleted them after the other
+        # updates, we'd delete based on collisions that hadn't yet been drawn.
+        # Additionally, there's no need to move a sprite during this update
+        # if we'll also delete it during this update.
+
+        # Check player collisions before player laser collisions so in the
+        # case of the player and a laser both hitting a meteor, the player
+        # dies
+        # If the player collides with any other sprite, they die
+        hits = arcade.check_for_collision_with_lists(self.player_sprite,
+                                                     [self.meteor_list,
+                                                      self.enemy_laser_list,
+                                                      self.enemy_list])
+
+        if hits:
+            # Decrement lives left
+            self.lives -= 1
+            self.player_sprite.remove_from_sprite_lists()
+            # TODO: Restart level?
+            for hit in hits:
+                hit.remove_from_sprite_lists()
+
+
+        # Check player laser collisions
+        # Check meteors and enemy ships separately to make point assignments
+        # easier
+
+        # Check player lasers hitting meteors
+        player_laser_hits = []
+
+        # There's not a method to check for collisions between one Spritelist
+        # and one or more others, so must iterate over player_laser_list
+        for laser in self.player_laser_list:
+
+            # No good way to break a line that's any longer
+            ht = arcade.check_for_collision_with_list(laser, self.meteor_list)
+            player_laser_hits += ht
+
+        # Assign points for each meteor hit
+        # TODO: should different amounts be assigned for different sizes?
+        #  If so, should different sizes be in different lists?
+        self.points += METEOR_POINTS * len(player_laser_hits)
+
+        # Destroy hit meteors
+        # TODO: add explosions and possibly fading debris
+        for sprite in player_laser_hits:
+            sprite.remove_from_sprite_lists()
+
+        # Check player lasers hitting enemy ships
+        player_laser_hits = []
+        for laser in self.player_laser_list:
+            ht = arcade.check_for_collision_with_list(laser, self.enemy_list)
+            player_laser_hits += ht
+
+        # Assign points for each enemy hit
+        self.points += ENEMY_POINTS * len(player_laser_hits)
+
+        # TODO: Give enemies lives so they don't disappear after one hit
+        # Destroy hit enemies
+        # TODO: add explosions and possibly fading debris
+        for sprite in player_laser_hits:
+            sprite.remove_from_sprite_lists()
+
+
+
         # Update player change_movement based on key presses
         # Default to no movement if keys aren't pressed
         self.player_sprite.change_angle = 0
@@ -620,7 +700,6 @@ class MyGameWindow(arcade.Window):
             self.player_sprite.speed = self.player_sprite.forward_rate
         if self.down_pressed and not self.up_pressed:
             self.player_sprite.speed = -self.player_sprite.forward_rate
-
 
         # TODO: Is this the right choice? I think so, since they player
         #  itself can't handle it because of the the key input...or can it?
