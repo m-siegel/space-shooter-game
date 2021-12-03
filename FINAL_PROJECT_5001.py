@@ -1,8 +1,11 @@
 """
 I-M Siegel
 
-Images from Space Shooter (Redux, plus fonts and sounds) by Kenney Vleugels
-(www.kenney.nl), licensed under Creative Commons.
+Explosion graphics from https://www.explosiongenerator.com/, via Arcade
+resources
+
+Other images from Space Shooter (Redux, plus fonts and sounds) by Kenney
+Vleugels (www.kenney.nl), licensed under Creative Commons.
 https://kenney.nl/assets/space-shooter-redux
 
 
@@ -13,13 +16,10 @@ Practice:
     - spawning (already done, but can check how they do)
 
 TODO:
-    - add collision between player lasers and meteors, player lasers and
-        enemy ships
-    - add collision between enemy lasers and player ship
-    - add score
-    - clean up (eg basic enemy from which meteors and enemy ships descend)
-    - add explosions
+    - clean up (eg basic enemy from which asteroids and enemy ships descend)
     - add add damage
+    - implement strings
+    - differing functions for resetting for new game and resetting for level
     - add lives?
     - add sounds
     - add levels and design levels
@@ -27,9 +27,15 @@ TODO:
     - add start screen
     - add end screen
     - add a compass so player can see where they're facing
+    - standardise images (paths and who controls, sprite or game)
 
 DONE:
     - add enemy lasers
+    - add collision between player lasers and asteroids, player lasers and
+        enemy ships
+    - add collision between enemy lasers and player ship
+    - add score
+    - add explosions
 
 """
 
@@ -180,8 +186,8 @@ class Laser(arcade.Sprite):
             self.alpha -= self.fade_rate // 3
 
 
-class Meteor(arcade.Sprite):
-    # TODO: maybe a list of meteor speeds at different levels
+class Asteroid(arcade.Sprite):
+    # TODO: maybe a list of asteroid speeds at different levels
     def __init__(self, image, scale=IMAGE_SCALE):
         super().__init__(filename=image, scale=scale)
 
@@ -241,7 +247,7 @@ class Meteor(arcade.Sprite):
         else:
             self.center_y += self.change_y
 
-        # Spin meteor
+        # Spin asteroid
         self.angle += self.change_angle
 
         # # TODO: Is there a way to make this less expensive? seems costly
@@ -257,13 +263,13 @@ class Meteor(arcade.Sprite):
         #     self.on_screen = True
 
         # Don't need above code, just check whether target x is same as center
-        # Eliminate meteors once they disappear offscreen
+        # Eliminate asteroids once they disappear offscreen
         if self.center_x == self.target_x and self.center_y == self.target_y:
             self.remove_from_sprite_lists()
 
     # TODO: DELETE (JUST FOR DEBUGGING)
     def __repr__(self):
-        return ("Meteor: center_x = {}, center_y = {}, speed = {}, "
+        return ("Asteroid: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
                 " change_y = {}".format(self.center_x, self.center_y,
                                         self.speed, self.target_x,
@@ -359,7 +365,55 @@ class EnemyShip(arcade.Sprite):
         self.target_y = y
 
 
+class Explosion(arcade.Sprite):
+    def __init__(self, center_x, center_y, scale=1):
 
+        # Initialize from super without images
+        super().__init__(center_x=center_x, center_y=center_y, scale=scale)
+
+        # List of textures (frames of an animation; ways the sprite can look)
+        self.textures = []
+
+        # Add textures from spritesheet
+        # "explosion.png" is 4096x3584, (16x14 grid of 256-sq pixel frames)
+        #  last row only has 13 frames
+        filename = "explosion.png"
+
+        # Dimensions of each frame to extract
+        width = 256
+        height = 256
+
+        # 221 frames to extract from sheet
+        for i in range(222):
+
+            # coordinates of top-left pixel of section to extract
+            # x coordinate changes with every image, cycling over 16 columns
+            # in each row
+            x = (i % 16) * width
+
+            # y coordinate changes for each row, every 16 images
+            y = (i // 16) * height
+
+            self.textures.append(arcade.load_texture(filename, x=x, y=y,
+                                                     width=width,
+                                                     height=height))
+
+        # Initialize current texture and texture index
+        self.cur_texture_index = 0
+        self.texture = self.textures[self.cur_texture_index]
+
+    def update(self):
+        """
+        Animate explosion.
+        """
+        # Animate explosion
+        if self.cur_texture_index < len(self.textures):
+            self.texture = self.textures[self.cur_texture_index]
+            self.cur_texture_index += 1
+
+        # Remove from lists
+        else:
+            self.remove_from_sprite_lists()
 
 
 class MyGameWindow(arcade.Window):
@@ -399,18 +453,18 @@ class MyGameWindow(arcade.Window):
                       "spaceshooter/PNG/Player_ships/playerShip2_blue.png",
                       "spaceshooter/PNG/Player_ships/playerShip3_blue.png"]
 
-        # Set up list of images to use for meteors
-        self.meteor_images = []
-        meteor_base_name = "spaceshooter/PNG/Meteors/meteorBrown_{}.png"
+        # Set up list of images to use for asteroids
+        self.asteroid_images = []
+        asteroid_base_name = "spaceshooter/PNG/Meteors/meteorBrown_{}.png"
         for i in range(1, 5):
-            self.meteor_images.append(meteor_base_name.format(
+            self.asteroid_images.append(asteroid_base_name.format(
                 "big{}".format(i)))
         for i in range(1, 3):
-            self.meteor_images.append(meteor_base_name.format(
+            self.asteroid_images.append(asteroid_base_name.format(
                 "med{}".format(i)))
-            self.meteor_images.append(meteor_base_name.format(
+            self.asteroid_images.append(asteroid_base_name.format(
                 "small{}".format(i)))
-            self.meteor_images.append(meteor_base_name.format(
+            self.asteroid_images.append(asteroid_base_name.format(
                 "tiny{}".format(i)))
 
         # List of enemy ship images
@@ -423,10 +477,12 @@ class MyGameWindow(arcade.Window):
 
         self.player_laser_list = None
 
-        self.meteor_list = None
+        self.asteroid_list = None
 
         self.enemy_list = None
         self.enemy_laser_list = None
+
+        self.explosion_list = None
 
         # Key press info
         self.left_pressed = False
@@ -460,27 +516,32 @@ class MyGameWindow(arcade.Window):
 
         self.player_laser_list = arcade.SpriteList()
 
-        self.meteor_list = arcade.SpriteList()
+        self.asteroid_list = arcade.SpriteList()
 
         self.enemy_list = arcade.SpriteList()
         self.enemy_laser_list = arcade.SpriteList()
 
-        # TODO: MAKE NUMBER AND SPEED DEPENDENT ON LEVEL
-        # Number of meteors depends upon level
-        self.make_meteors(10, (50, 200))    # TODO: undo numbers
+        self.explosion_list = arcade.SpriteList()
 
-        # Number of meteors depends upon level
+        # TODO: MAKE NUMBER AND SPEED DEPENDENT ON LEVEL
+        # Number of asteroids depends upon level
+        self.make_asteroids(10, (50, 200))    # TODO: undo numbers
+
+        # Number of asteroids depends upon level
         self.make_enemy_ships(10, (50, 100))
 
-    def make_meteors(self, num_meteors, speed_range):
+    def make_asteroids(self, num_asteroids, speed_range):
 
         # TODO: Start them way closer to edge of screen
-        for i in range(num_meteors + 1):
-            self.meteor_list.append(Meteor(random.choice(self.meteor_images)))
+        for i in range(num_asteroids + 1):
+            asteroid = Asteroid(random.choice(self.asteroid_images))
+
+            # TODO: MOVE THIS LATER -- AT END WOULD BE EASIER
+            self.asteroid_list.append(asteroid)
 
             # Get coordinates of random point offscreen by getting a random
             # x and a corresponding y that makes it work
-            diagonal = self.meteor_list[-1].diagonal
+            diagonal = self.asteroid_list[-1].diagonal
 
             # x can be anywhere in the width of the screen, and a little to
             # the left or right
@@ -507,18 +568,18 @@ class MyGameWindow(arcade.Window):
             else:
                 y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
 
-            # Set coordinates of meteor
-            self.meteor_list[-1].center_x = x
-            self.meteor_list[-1].center_y = y
+            # Set coordinates of asteroid
+            self.asteroid_list[-1].center_x = x
+            self.asteroid_list[-1].center_y = y
 
-            # Set random speed of meteor within range
-            self.meteor_list[-1].speed = random.randrange(speed_range[0],
-                                                          speed_range[1])
+            # Set random speed of asteroid within range
+            self.asteroid_list[-1].speed = random.randrange(speed_range[0],
+                                                            speed_range[1])
 
-            # Set random spin rate for meteor, avoiding zero
-            self.meteor_list[-1].change_angle = random.randrange(-5, 6, 2)
+            # Set random spin rate for asteroid, avoiding zero
+            self.asteroid_list[-1].change_angle = random.randrange(-5, 6, 2)
 
-            # Set random target point for meteor across screen
+            # Set random target point for asteroid across screen
 
             #
             if x < 0:
@@ -536,8 +597,8 @@ class MyGameWindow(arcade.Window):
             else:
                 target_y = random.randrange(SCREEN_HEIGHT)
 
-            self.meteor_list[-1].target_x = target_x
-            self.meteor_list[-1].target_y = target_y
+            self.asteroid_list[-1].target_x = target_x
+            self.asteroid_list[-1].target_y = target_y
 
 
 
@@ -583,13 +644,13 @@ class MyGameWindow(arcade.Window):
             else:
                 y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
 
-            # Set coordinates of meteor
+            # Set coordinates of asteroid
             self.enemy_list[-1].center_x = x
             self.enemy_list[-1].center_y = y
 
-            # Set random speed of meteor within range
+            # Set random speed of asteroid within range
             self.enemy_list[-1].speed = random.randrange(speed_range[0],
-                                                          speed_range[1])
+                                                         speed_range[1])
 
             # TODO: CHANGE THIS TO BE BASED ON LEVEL
             self.enemy_list[-1].laser_speed = 3 * self.enemy_list[-1].speed
@@ -605,10 +666,18 @@ class MyGameWindow(arcade.Window):
 
         # Drawing with SpriteList means anything outside the viewport won't
         # be drawn
-        self.meteor_list.draw()
+        self.asteroid_list.draw()
 
         self.enemy_laser_list.draw()
         self.enemy_list.draw()
+
+        self.explosion_list.draw()
+
+        # Draw writing last so it can be seen
+        arcade.draw_text("Points: {}".format(self.points), 20,
+                         SCREEN_HEIGHT - 20, font_size=14, bold=True)
+        arcade.draw_text("Level: {}".format(self.level), 20,
+                         SCREEN_HEIGHT - 50, font_size=14, bold=True)
 
     def on_update(self, delta_time):
         """
@@ -625,17 +694,21 @@ class MyGameWindow(arcade.Window):
         # if we'll also delete it during this update.
 
         # Check player collisions before player laser collisions so in the
-        # case of the player and a laser both hitting a meteor, the player
+        # case of the player and a laser both hitting a asteroid, the player
         # dies
         # If the player collides with any other sprite, they die
         hits = arcade.check_for_collision_with_lists(self.player_sprite,
-                                                     [self.meteor_list,
+                                                     [self.asteroid_list,
                                                       self.enemy_laser_list,
                                                       self.enemy_list])
 
         if hits:
             # Decrement lives left
             self.lives -= 1
+            self.explosion_list.append(Explosion(self.player_sprite.center_x,
+                                                 self.player_sprite.center_y))
+            # TODO: DEAL WITH PLAYER SPRITE'S CONTINUED EXISTANCE AND LASERS
+            #  for lasers, just make them made by the sprite on updates, like movement
             self.player_sprite.remove_from_sprite_lists()
             # TODO: Restart level?
             for hit in hits:
@@ -643,10 +716,10 @@ class MyGameWindow(arcade.Window):
 
 
         # Check player laser collisions
-        # Check meteors and enemy ships separately to make point assignments
+        # Check asteroids and enemy ships separately to make point assignments
         # easier
 
-        # Check player lasers hitting meteors
+        # Check player lasers hitting asteroids
         player_laser_hits = []
 
         # There's not a method to check for collisions between one Spritelist
@@ -654,17 +727,20 @@ class MyGameWindow(arcade.Window):
         for laser in self.player_laser_list:
 
             # No good way to break a line that's any longer
-            ht = arcade.check_for_collision_with_list(laser, self.meteor_list)
+            ht = arcade.check_for_collision_with_list(laser,
+                                                      self.asteroid_list)
             player_laser_hits += ht
 
-        # Assign points for each meteor hit
+        # Assign points for each asteroid hit
         # TODO: should different amounts be assigned for different sizes?
         #  If so, should different sizes be in different lists?
         self.points += METEOR_POINTS * len(player_laser_hits)
 
-        # Destroy hit meteors
+        # Destroy hit asteroids
         # TODO: add explosions and possibly fading debris
         for sprite in player_laser_hits:
+            self.explosion_list.append(Explosion(sprite.center_x,
+                                                 sprite.center_y))
             sprite.remove_from_sprite_lists()
 
         # Check player lasers hitting enemy ships
@@ -678,8 +754,10 @@ class MyGameWindow(arcade.Window):
 
         # TODO: Give enemies lives so they don't disappear after one hit
         # Destroy hit enemies
-        # TODO: add explosions and possibly fading debris
+        # TODO: possibly possibly fading debris
         for sprite in player_laser_hits:
+            self.explosion_list.append(Explosion(sprite.center_x,
+                                                 sprite.center_y))
             sprite.remove_from_sprite_lists()
 
 
@@ -725,17 +803,21 @@ class MyGameWindow(arcade.Window):
 
         self.player_list.on_update(delta_time)
         self.player_laser_list.on_update(delta_time)
-        self.meteor_list.on_update(delta_time)
+        self.asteroid_list.on_update(delta_time)
         self.enemy_list.on_update(delta_time)
         self.enemy_laser_list.on_update(delta_time)
 
+        self.explosion_list.update()
+
     def on_key_press(self, symbol, modifiers):
         # Gracefully quit program
-        if symbol == arcade.key.W and modifiers == arcade.key.MOD_COMMAND:
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
             arcade.close_window()
 
         # Restart program
-        if symbol == arcade.key.R and modifiers == arcade.key.MOD_COMMAND:
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
             self.setup()
 
         if symbol == arcade.key.RIGHT:
@@ -750,16 +832,16 @@ class MyGameWindow(arcade.Window):
         if symbol == arcade.key.SPACE:
             self.space_pressed = True
 
-        # TODO: DELETE -- JUST USED FOR DEBUGGING
-        if symbol == arcade.key.P:
-            for meteor in self.meteor_list:
-                # print("{}, {}\n{}, {}\n{}\n".format(meteor.center_x,
-                #                                     meteor.center_y,
-                #                                     meteor.target_x,
-                #                                     meteor.target_y,
-                #                                     meteor.speed))
-                print(meteor)
-            print("-" * 50)
+        # # TODO: DELETE -- JUST USED FOR DEBUGGING
+        # if symbol == arcade.key.P:
+        #     for asteroid in self.asteroid_list:
+        #         # print("{}, {}\n{}, {}\n{}\n".format(asteroid.center_x,
+        #         #                                     asteroid.center_y,
+        #         #                                     asteroid.target_x,
+        #         #                                     asteroid.target_y,
+        #         #                                     asteroid.speed))
+        #         print(asteroid)
+        #     print("-" * 50)
 
     def on_key_release(self, symbol, modifiers):
 
