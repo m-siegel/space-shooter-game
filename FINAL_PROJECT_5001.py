@@ -13,6 +13,20 @@ Practice:
     - spawning (already done, but can check how they do)
 
 TODO:
+    - add enemy lasers
+    - add collision between player lasers and meteors, player lasers and
+        enemy ships
+    - add collision between enemy lasers and player ship
+    - add score
+    - clean up (eg basic enemy from which meteors and enemy ships descend)
+    - add explosions
+    - add add damage
+    - add lives?
+    - add sounds
+    - add levels and design levels
+        - add shortcuts (cmd 1, cmd 2, cmd 3)
+    - add start screen
+    - add end screen
     - add a compass so player can see where they're facing
 """
 
@@ -26,7 +40,9 @@ SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 800
 SCREEN_TITLE = "Space Shooter"
 
+# TODO: put this laser_image just within player
 LASER_IMAGE = "spaceshooter/PNG/Lasers/laserBlue01.png"
+
 IMAGE_SCALE = .5
 
 
@@ -120,11 +136,11 @@ class Player(arcade.Sprite):
 class Laser(arcade.Sprite):
     # TODO: maybe a list of bullet speeds at different levels
     def __init__(self,  x, y, image=LASER_IMAGE, scale=IMAGE_SCALE,
-                 angle=0):
+                 angle=0, speed=200, fade_rate=0):
         super().__init__(filename=image, scale=scale, center_x=x, center_y=y,
-                         angle=angle)
+                         angle=angle, )
 
-        self.speed = 200
+        self.speed = speed
 
         # Set direction angle
         self.change_x = -math.sin(math.radians(self.angle))
@@ -137,12 +153,25 @@ class Laser(arcade.Sprite):
         # Frames since initialization
         self.frames = 0
 
+        # How quickly the laser should disappear
+        self.fade_rate = fade_rate
+
     def on_update(self, delta_time: float = 1 / 60):
         # used to track when to spawn laser and when it should die
         self.frames += 1
         # Always move in the same direction at the same rate
         self.center_x += self.change_x * self.speed * delta_time
         self.center_y += self.change_y * self.speed * delta_time
+
+        # Fade player_lasers out after firing
+        # TODO: Is this an okay use of try-except?
+        if self.frames > 60:
+            try:
+                self.alpha -= self.fade_rate
+            except ValueError:
+                self.remove_from_sprite_lists()
+        elif self.frames > 50:
+            self.alpha -= self.fade_rate // 3
 
 
 class Meteor(arcade.Sprite):
@@ -237,9 +266,21 @@ class Meteor(arcade.Sprite):
 
 
 class EnemyShip(arcade.Sprite):
-    def __init__(self, image, scale=IMAGE_SCALE):
+    def __init__(self, image, laser_list, scale=IMAGE_SCALE):
         super().__init__(filename=image, scale=scale)
 
+        # Pointer to game window's enemy_laser_list
+        self.laser_list = laser_list
+
+        # Laser image
+        # TODO: why is this hardcoded when image is a parameter?
+        self.laser_image = "spaceshooter/PNG/Lasers/laserRed01.png"
+
+        # TODO: how and when should these be set up? to be flexible
+        self.laser_speed = 0    # twice ship speed
+        self.reload_time = 0
+
+        # TODO: make setup method to handle this
         # Initialize speed to not moving
         self.speed = 0
 
@@ -293,6 +334,19 @@ class EnemyShip(arcade.Sprite):
             self.center_y = self.target_y
         else:
             self.center_y += self.change_y
+
+        # Periodically shoot at player
+        self.reload_time -= 1
+        if self.reload_time <= 0:
+            # TODO: look through angle stuff to comment here
+            # TODO: set speed and fade rate based on level
+            self.laser_list.append(Laser(self.center_x, self.center_y,
+                                         image=self.laser_image,
+                                         angle=self.angle + 180,
+                                         speed=self.laser_speed,
+                                         fade_rate=20))
+            # TODO: fix this...
+            self.reload_time = self.laser_speed
 
     def set_target(self, x, y):
         self.target_x = x
@@ -403,7 +457,7 @@ class MyGameWindow(arcade.Window):
         self.make_meteors(10, (50, 200))    # TODO: undo numbers
 
         # Number of meteors depends upon level
-        self.make_enemy_ships(10, (50, 200))
+        self.make_enemy_ships(10, (50, 100))
 
     def make_meteors(self, num_meteors, speed_range):
 
@@ -476,11 +530,14 @@ class MyGameWindow(arcade.Window):
 
 
     # TODO: THIS IS THE SAME AS MAKE_METEORS SO MAKE AS ONE FUNCTION
+    # TODO: make most of this a setup method for sprite
     def make_enemy_ships(self, num_enemies, speed_range):
 
         # TODO: Start them way closer to edge of screen
         for i in range(num_enemies + 1):
-            self.enemy_list.append(EnemyShip(self.enemy_ship_images[0]))
+            # Pass laser list to enemy so enemy can fill it
+            self.enemy_list.append(EnemyShip(self.enemy_ship_images[0],
+                                   self.enemy_laser_list))
 
             # Get diagonal size of enemy_ship to hide it offscreen
             diagonal = self.enemy_list[-1].diagonal
@@ -521,6 +578,9 @@ class MyGameWindow(arcade.Window):
             self.enemy_list[-1].speed = random.randrange(speed_range[0],
                                                           speed_range[1])
 
+            # TODO: CHANGE THIS TO BE BASED ON LEVEL
+            self.enemy_list[-1].laser_speed = 3 * self.enemy_list[-1].speed
+
 
     def on_draw(self):
         arcade.start_render()
@@ -534,8 +594,8 @@ class MyGameWindow(arcade.Window):
         # be drawn
         self.meteor_list.draw()
 
-        self.enemy_list.draw()
         self.enemy_laser_list.draw()
+        self.enemy_list.draw()
 
     def on_update(self, delta_time):
         """
@@ -561,26 +621,22 @@ class MyGameWindow(arcade.Window):
         if self.down_pressed and not self.up_pressed:
             self.player_sprite.speed = -self.player_sprite.forward_rate
 
+
+        # TODO: Is this the right choice? I think so, since they player
+        #  itself can't handle it because of the the key input...or can it?
+        #  Figure out how it can...similar to enemy sprite
         # Shoot player_lasers periodically while space is pressed
         self.reloading -= 1
         if self.space_pressed and self.reloading <= 0:
             self.player_laser_list.append(Laser(self.player_sprite.center_x,
                                                 self.player_sprite.center_y,
-                                                angle=self.player_sprite.angle))
+                                                angle=self.player_sprite.angle,
+                                                fade_rate=30))
             # Slow enough reload time that player could do it faster by
             # repeatedly hitting space, but fast enough to be fun
             self.reloading = 10
 
-        # Fade player_lasers out after firing
-        for laser in self.player_laser_list:
-            # TODO: Is this an okay use of try-except?
-            if laser.frames > 60:
-                try:
-                    laser.alpha -= 30
-                except ValueError:
-                    laser.remove_from_sprite_lists()
-            elif laser.frames > 50:
-                laser.alpha -= 10
+        # TODO: give player pointer to laser list like enemies? no need?
 
         # Set enemies' new target point as player's current (soon-to-be-old)
         # location
