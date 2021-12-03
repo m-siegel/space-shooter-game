@@ -52,7 +52,7 @@ SCREEN_TITLE = "Space Shooter"
 # TODO: put this laser_image just within player
 LASER_IMAGE = "spaceshooter/PNG/Lasers/laserBlue01.png"
 
-METEOR_POINTS = 5
+ASTEROID_POINTS = 5
 ENEMY_POINTS = 15
 
 IMAGE_SCALE = .5
@@ -186,8 +186,7 @@ class Laser(arcade.Sprite):
             self.alpha -= self.fade_rate // 3
 
 
-class Asteroid(arcade.Sprite):
-    # TODO: maybe a list of asteroid speeds at different levels
+class TargetingSprite(arcade.Sprite):
     def __init__(self, image, scale=IMAGE_SCALE):
         super().__init__(filename=image, scale=scale)
 
@@ -203,18 +202,11 @@ class Asteroid(arcade.Sprite):
         self.change_x = 0
         self.change_y = 0
 
-        # Set spinning at random rate
-        self.change_angle = 0
-
         # Largest measurement. Used to determine if can be seen offscreen at
         # any angle
         self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
 
-        # # Whether visible based on location (not alpha, like visible)
-        # self.on_screen = False
-
     def on_update(self, delta_time: float = 1 / 60):
-
         # Get x and y distance to target from current position
         x_distance = self.target_x - self.center_x
         y_distance = self.target_y - self.center_y
@@ -226,6 +218,10 @@ class Asteroid(arcade.Sprite):
         # Angle between -pi and pi, formed by pos x axis and vector to target
         # Handles situations that would raise ZeroDivisionError with math.tan
         angle_rad = math.atan2(y_distance, x_distance)
+
+        # Arcade's sprite has methods to do something similar to this
+        # (getting the change in x and y from the angle and updating sprite's
+        # position), but it doesn't factor in delta_time
 
         # Since angle's initial side is pos x axis, use normal trig functions
         # to find changes in x and y
@@ -247,23 +243,33 @@ class Asteroid(arcade.Sprite):
         else:
             self.center_y += self.change_y
 
+        # TODO: this is to support EnemyShip's movement
+        return angle_rad
+
+    # TODO: unique to EnemyShip, but okay for both to have, necessary to neither
+    def set_target(self, x, y):
+        self.target_x = x
+        self.target_y = y
+
+
+class Asteroid(TargetingSprite):
+    # TODO: what if initialized without image so random one could be chosen in
+    #  setup? Or, could random one be chosen here and then super's init called?
+    #  Could the list of meteor images be a class variable first? Or global?
+    def __init__(self, image, scale=IMAGE_SCALE):
+        super().__init__(image=image, scale=scale)
+
+        # TODO: don't think is necessary since sprite has
+        # Set spinning at random rate
+        self.change_angle = 0
+
+    def on_update(self, delta_time: float = 1 / 60):
+        super().on_update(delta_time)
+
         # Spin asteroid
         self.angle += self.change_angle
 
-        # # TODO: Is there a way to make this less expensive? seems costly
-        # # Set whether or not visible based on location (not alpha)
-        # if (self.center_x < -self.diagonal // 2
-        #         or self.center_x > SCREEN_WIDTH + self.diagonal // 2):
-        #     self.on_screen = False
-        # # Only need to check y-based visibility if could be visible based on x
-        # elif (self.center_y < -self.diagonal // 2
-        #         or self.center_y > SCREEN_HEIGHT + self.diagonal // 2):
-        #     self.on_screen = False
-        # else:
-        #     self.on_screen = True
-
-        # Don't need above code, just check whether target x is same as center
-        # Eliminate asteroids once they disappear offscreen
+        # Eliminate asteroids once they disappear offscreen (reach target)
         if self.center_x == self.target_x and self.center_y == self.target_y:
             self.remove_from_sprite_lists()
 
@@ -277,9 +283,10 @@ class Asteroid(arcade.Sprite):
                                         self.change_y))
 
 
-class EnemyShip(arcade.Sprite):
+class EnemyShip(TargetingSprite):
     def __init__(self, image, laser_list, scale=IMAGE_SCALE):
-        super().__init__(filename=image, scale=scale)
+        # TODO: commentary on why inheriting from BasicEnemy?
+        super().__init__(image=image, scale=scale)
 
         # Pointer to game window's enemy_laser_list
         self.laser_list = laser_list
@@ -289,68 +296,24 @@ class EnemyShip(arcade.Sprite):
         self.laser_image = "spaceshooter/PNG/Lasers/laserRed01.png"
 
         # TODO: how and when should these be set up? to be flexible
-        self.laser_speed = 0    # twice ship speed
+        self.laser_speed = 0  # twice ship speed
         self.reload_time = 0
 
-        # TODO: make setup method to handle this
-        # Initialize speed to not moving
-        self.speed = 0
-
-        # Initialize target point to center of screen
-        self.target_x = SCREEN_WIDTH / 2
-        self.target_y = SCREEN_HEIGHT / 2
-
-        # TODO: DON'T THINK I NEED THESE HERE -- INHERITED?
-        # Amount to change x and y to move in straight line to target
-        self.change_x = 0
-        self.change_y = 0
-
-        # Largest measurement. Used to determine if can be seen offscreen at
-        # any angle
-        self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
-
-    def on_update(self, delta_time: float = 1/60):
-        # Get x and y distance to target from current position
-        x_distance = self.target_x - self.center_x
-        y_distance = self.target_y - self.center_y
-
-        # No need to move if already at target point
-        if x_distance == 0 and y_distance == 0:
-            return
-
-        # Angle between -pi and pi, formed by pos x axis and vector to target
-        # Handles situations that would raise ZeroDivisionError with math.tan
-        angle_rad = math.atan2(y_distance, x_distance)
+    def on_update(self, delta_time: float = 1 / 60):
+        # Moves sprite towards target point at speed, returns angle to target
+        angle_rad = super().on_update(
+            delta_time)  # TODO: is the argument necessary?
 
         # Set angle of ship to match angle of movement
         # angle_rad is the measured from the positive x axis, but image
-        # angles are measured from the positive y axis
+        # initially faces down
         self.angle = math.degrees(angle_rad) + 90
-
-        # Since angle's initial side is pos x axis, use normal trig functions
-        # to find changes in x and y
-        self.change_x = math.cos(angle_rad)
-        self.change_y = math.sin(angle_rad)
-
-        # Set new center_x
-        # Move to target if within range, otherwise move towards target
-        self.change_x *= self.speed * delta_time
-        if abs(x_distance) <= self.change_x:
-            self.center_x = self.target_x
-        else:
-            self.center_x += self.change_x
-
-        # Set new center_y
-        self.change_y *= self.speed * delta_time
-        if abs(y_distance) <= self.change_y:
-            self.center_y = self.target_y
-        else:
-            self.center_y += self.change_y
 
         # Periodically shoot at player
         self.reload_time -= 1
         if self.reload_time <= 0:
-            # TODO: look through angle stuff to comment here
+            # TODO: look through angle stuff to comment here -- space ship
+            #  initial angle is south, but laser's is North, so + 180?
             # TODO: set speed and fade rate based on level
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          image=self.laser_image,
@@ -359,10 +322,6 @@ class EnemyShip(arcade.Sprite):
                                          fade_rate=20))
             # TODO: fix this...
             self.reload_time = self.laser_speed
-
-    def set_target(self, x, y):
-        self.target_x = x
-        self.target_y = y
 
 
 class Explosion(arcade.Sprite):
@@ -603,7 +562,7 @@ class MyGameWindow(arcade.Window):
 
 
 
-    # TODO: THIS IS THE SAME AS MAKE_METEORS SO MAKE AS ONE FUNCTION
+    # TODO: THIS IS THE SAME AS MAKE_ASTEROIDS SO MAKE AS ONE FUNCTION
     # TODO: make most of this a setup method for sprite
     def make_enemy_ships(self, num_enemies, speed_range):
 
@@ -708,59 +667,62 @@ class MyGameWindow(arcade.Window):
             self.explosion_list.append(Explosion(self.player_sprite.center_x,
                                                  self.player_sprite.center_y))
             # TODO: DEAL WITH PLAYER SPRITE'S CONTINUED EXISTANCE AND LASERS
-            #  for lasers, just make them made by the sprite on updates, like movement
+            #  for lasers, just make them made by the sprite on updates,
+            #  like movement
             self.player_sprite.remove_from_sprite_lists()
             # TODO: Restart level?
             for hit in hits:
                 hit.remove_from_sprite_lists()
 
-
         # Check player laser collisions
-        # Check asteroids and enemy ships separately to make point assignments
-        # easier
-
-        # Check player lasers hitting asteroids
-        player_laser_hits = []
+        # Lists to track hit asteroids and enemies separately for scoring
+        asteroids_hit = []
+        enemies_hit = []
 
         # There's not a method to check for collisions between one Spritelist
         # and one or more others, so must iterate over player_laser_list
-        for laser in self.player_laser_list:
 
-            # No good way to break a line that's any longer
-            ht = arcade.check_for_collision_with_list(laser,
-                                                      self.asteroid_list)
-            player_laser_hits += ht
+        # Iterate backwards over list of lasers to avoid IndexErrors as lasers
+        # are removed
+        for i in range(len(self.player_laser_list) - 1, -1, -1):
 
-        # Assign points for each asteroid hit
-        # TODO: should different amounts be assigned for different sizes?
-        #  If so, should different sizes be in different lists?
-        self.points += METEOR_POINTS * len(player_laser_hits)
+            # Get asteroids this laser has collided with
+            a = arcade.check_for_collision_with_list(self.player_laser_list[i],
+                                                     self.asteroid_list)
 
-        # Destroy hit asteroids
-        # TODO: add explosions and possibly fading debris
-        for sprite in player_laser_hits:
-            self.explosion_list.append(Explosion(sprite.center_x,
-                                                 sprite.center_y))
-            sprite.remove_from_sprite_lists()
+            # Get enemies this laser has collided with
+            e = arcade.check_for_collision_with_list(self.player_laser_list[i],
+                                                     self.enemy_list)
 
-        # Check player lasers hitting enemy ships
-        player_laser_hits = []
-        for laser in self.player_laser_list:
-            ht = arcade.check_for_collision_with_list(laser, self.enemy_list)
-            player_laser_hits += ht
+            # Remove laser if it hit anything
+            if a or e:
+                self.player_laser_list[i].remove_from_sprite_lists()
 
-        # Assign points for each enemy hit
-        self.points += ENEMY_POINTS * len(player_laser_hits)
+                # Add these hit ateroids and enemies to lists of all hit asteroids
+                # and enemies
+                asteroids_hit += a
+                enemies_hit += e
 
-        # TODO: Give enemies lives so they don't disappear after one hit
-        # Destroy hit enemies
-        # TODO: possibly possibly fading debris
-        for sprite in player_laser_hits:
-            self.explosion_list.append(Explosion(sprite.center_x,
-                                                 sprite.center_y))
-            sprite.remove_from_sprite_lists()
+        # Add points for each hit
+        # TODO: should different sizes earn different points?
+        self.points += ASTEROID_POINTS * len(asteroids_hit)
+        self.points += ENEMY_POINTS * len(enemies_hit)
 
-
+        # TODO: Make function to remove and do explosions
+        #  def destroy(sprites_lst):
+        #      for sprite in sprites_lst:
+        #          self.explosion_list.append(Explosion(sprite.center_x,
+        #                                          sprite.center_y))
+        #          sprite.remove_from_sprite_lists()
+        # Remove hit sprites
+        for asteroid in asteroids_hit:
+            self.explosion_list.append(Explosion(asteroid.center_x,
+                                                 asteroid.center_y))
+            asteroid.remove_from_sprite_lists()
+        for enemy in enemies_hit:
+            self.explosion_list.append(Explosion(enemy.center_x,
+                                                 enemy.center_y))
+            enemy.remove_from_sprite_lists()
 
         # Update player change_movement based on key presses
         # Default to no movement if keys aren't pressed
