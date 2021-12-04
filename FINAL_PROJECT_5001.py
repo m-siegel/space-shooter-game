@@ -39,8 +39,6 @@ Practice:
     - spawning (already done, but can check how they do)
 
 TODO:
-    - figure out why enemy lasers shoot long when they first start
-    - change meteors: maybe only big and med ones at .5 scale (maybe small, too)
     - differing functions for resetting for new game and resetting for level (eg when points should be reset)
     - add levels and design levels
         - add shortcuts (cmd 1, cmd 2, cmd 3)
@@ -49,12 +47,15 @@ TODO:
         - add end screen
     ------------------------------------
     STYLE
-        - PEP8
+        - type hints
+        - DEFENSIVE PROGRAMMING (at least in the method params, not name mangling)
+        - PEP8 COMPLIANCE
         - general structure
-        - comments
+        - COMMENTS
     ------------------------------------
     PRESENTATION
     ------------------------------------
+    - change meteors: maybe only big and med ones at .5 scale (maybe small, too)
     - add lives?
     - add damage
     - implement strings???
@@ -69,6 +70,8 @@ DONE:
     - add explosions
     - clean up (eg basic enemy from which asteroids and enemy ships descend)
     - no filenames or globals hardcoded into classes other than MyGameWindow.
+    - figure out why enemy lasers shoot long when they first start
+
 """
 
 
@@ -96,9 +99,9 @@ ENEMY_POINTS = 15
 IMAGE_SCALE = .5
 
 # Player ship filenames (3 strign filenames: one for each level)
-PLAYER_SHIPS = ["spaceshooter/PNG/Player_ships/playerShip1_blue.png",
+PLAYER_SHIPS = ("spaceshooter/PNG/Player_ships/playerShip1_blue.png",
                 "spaceshooter/PNG/Player_ships/playerShip2_blue.png",
-                "spaceshooter/PNG/Player_ships/playerShip3_blue.png"]
+                "spaceshooter/PNG/Player_ships/playerShip3_blue.png")
 # In case image needs unique scaling
 PLAYER_SHIP_SCALE = IMAGE_SCALE
 
@@ -109,8 +112,8 @@ PLAYER_LASER_SCALE = IMAGE_SCALE
 
 
 # Enemy Ship filenames (2 filename strings: one for each of levels 2 and 3)
-ENEMY_SHIPS = ["spaceshooter/PNG/Enemies/enemyRed1.png",
-               "spaceshooter/PNG/Enemies/enemyRed2.png"]
+ENEMY_SHIPS = ("spaceshooter/PNG/Enemies/enemyRed1.png",
+               "spaceshooter/PNG/Enemies/enemyRed2.png")
 ENEMY_SHIP_SCALE = IMAGE_SCALE
 
 # Used in main() to get variations on base filename using iteration
@@ -155,7 +158,7 @@ class Player(arcade.Sprite):
 
     # TODO: update caller to send laser_filename and laser_list
     def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, window_dims, laser_fade_rate=30):
+                 laser_list, window_dims, laser_fade_rate=15):
         super().__init__(filename=image_filename, scale=scale)
         """
         Constructor. Sets attributes self.speed, self.angle_rate and 
@@ -284,15 +287,22 @@ class Laser(arcade.Sprite):
         self.center_x += self.change_x * self.speed * delta_time
         self.center_y += self.change_y * self.speed * delta_time
 
+        # Remove very faint lasers
+        # (feels weird to destroy an obstacle with invisible laser)
+        if self.alpha <= 20:
+            self.remove_from_sprite_lists()
+
         # Fade player_lasers out after firing
-        # TODO: Is this an okay use of try-except?
         if self.frames > 60:
             try:
                 self.alpha -= self.fade_rate
             except ValueError:
                 self.remove_from_sprite_lists()
         elif self.frames > 50:
-            self.alpha -= self.fade_rate // 3
+            try:
+                self.alpha -= self.fade_rate // 3
+            except ValueError:
+                self.remove_from_sprite_lists()
 
 
 class TargetingSprite(arcade.Sprite):
@@ -304,7 +314,7 @@ class TargetingSprite(arcade.Sprite):
 
         # Initialize target point to center of screen
         self.target_x = target_x
-        self.target_y = target_x
+        self.target_y = target_y
 
         # TODO: DON'T THINK I NEED THESE HERE -- INHERITED?
         # Amount to change x and y to move in straight line to target
@@ -321,32 +331,37 @@ class TargetingSprite(arcade.Sprite):
         y_distance = self.target_y - self.center_y
 
         # No need to move if already at target point
-        if x_distance == 0 and y_distance == 0:
-            return
+        if x_distance != 0 or y_distance != 0:
 
-        # Angle between -pi and pi, formed by pos x axis and vector to target
-        # Handles situations that would raise ZeroDivisionError with math.tan
-        angle_rad = math.atan2(y_distance, x_distance)
+            # Angle between -pi and pi, formed by pos x axis and vector to
+            # target. Handles situations that would raise ZeroDivisionError
+            # with math.tan
+            angle_rad = math.atan2(y_distance, x_distance)
 
-        # Arcade's sprite has methods to do something similar to this
-        # (getting the change in x and y from the angle and updating sprite's
-        # position), but it doesn't factor in delta_time
+            # Arcade's sprite has methods to do something similar to this
+            # (getting the change in x and y from the angle and updating
+            # sprite's position), but it doesn't factor in delta_time
 
-        # Since angle's initial side is pos x axis, use normal trig functions
-        # to find changes in x and y
-        self.change_x = math.cos(angle_rad)
-        self.change_y = math.sin(angle_rad)
+            # Since angle's initial side is pos x axis, use normal trig
+            # functions to find changes in x and y per unit of 1
+            self.change_x = math.cos(angle_rad)
+            self.change_y = math.sin(angle_rad)
+
+            # Find changes in x and y in terms of speed and delta time
+            self.change_x *= self.speed * delta_time
+            self.change_y *= self.speed * delta_time
+
+        else:
+            angle_rad = math.radians(self.angle - 90)
 
         # Set new center_x
         # Move to target if within range, otherwise move towards target
-        self.change_x *= self.speed * delta_time
         if abs(x_distance) <= self.change_x:
             self.center_x = self.target_x
         else:
             self.center_x += self.change_x
 
         # Set new center_y
-        self.change_y *= self.speed * delta_time
         if abs(y_distance) <= self.change_y:
             self.center_y = self.target_y
         else:
@@ -409,6 +424,7 @@ class TargetingSprite(arcade.Sprite):
         else:
             step = speed_range[2]
 
+        # TODO speed range (0, 0) or any single int, just make that the speed
         self.speed = random.randrange(speed_range[0], speed_range[1], step)
 
     # TODO: currently only used for Asteroid, but doesn't hurt to have for all
@@ -481,7 +497,7 @@ class Asteroid(TargetingSprite):
 
 class EnemyShip(TargetingSprite):
     def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, laser_fade_rate=40):
+                 laser_list, laser_fade_rate=40, reload_time=10):
         # TODO: commentary on why inheriting from BasicEnemy?
         super().__init__(image_filename, scale)
 
@@ -495,12 +511,13 @@ class EnemyShip(TargetingSprite):
 
         # TODO: how and when should these be set up? to be flexible
         self.laser_speed = 0  # twice ship speed
-        self.reload_time = 0
+
+        # Ships should be able to shoot the moment they're created
+        self.reload_time = reload_time + 10
 
     def on_update(self, delta_time: float = 1 / 60):
         # Moves sprite towards target point at speed, returns angle to target
-        angle_rad = super().on_update(
-            delta_time)  # TODO: is the argument necessary?
+        angle_rad = super().on_update(delta_time)  # TODO: is the argument necessary?
 
         # Set angle of ship to match angle of movement
         # angle_rad is the measured from the positive x axis, but image
@@ -566,9 +583,10 @@ class MyGameWindow(arcade.Window):
     def __init__(self, width: int, height: int, title: str,
                  explosion_textures: Tuple[List[arcade.Texture], Union[int,
                                                                        float]],
-                 player_ship_files: Tuple[List[str], Union[int, float]],
+                 player_ship_files: Tuple[Tuple[str, str, str],
+                                          Union[int, float]],
                  player_laser_file: Tuple[str, Union[int, float]],
-                 enemy_ship_files: Tuple[List[str], Union[int, float]],
+                 enemy_ship_files: Tuple[Tuple[str, str], Union[int, float]],
                  enemy_laser_file: Tuple[str, Union[int, float]],
                  asteroid_files: Tuple[List[str], Union[int, float]]):
         """
@@ -586,8 +604,7 @@ class MyGameWindow(arcade.Window):
         arcade.set_background_color((0, 0, 0))
 
         # Used for indexing, so start at zero
-        # TODO: add 1 whenever displaying on screen
-        self.level = 0
+        self.level = 1
 
         # Start with 0 points
         self.points = 0
@@ -595,7 +612,11 @@ class MyGameWindow(arcade.Window):
         # Lives TODO: IDK if this should go here or in player
         self.lives = 3
 
-        # TODO: MAKE PARAMETER AND GET FROM MAIN(), PROBS IN SETUP()
+        # Exception will be thrown if there's an attempt to update this
+        # before setup() is called. That is intentional
+        self.updates_this_level = None
+
+        # Store all sprite image and scale data
         # Pre-loaded list of arcade.Textures for explosion sprite
         self.explosion_textures = explosion_textures[0]
         self.explosion_image_scale = explosion_textures[1]
@@ -622,6 +643,32 @@ class MyGameWindow(arcade.Window):
         self.up_pressed = False
         self.down_pressed = False
         self.space_pressed = False
+
+        # TODO: should these be stored directly as attributes at the start of
+        #  the level so less work has to be done checking level updates vs
+        #  spawn rate, etc?
+
+        # Game level settings store specific settings (which ship image to
+        # use, how many asteroids or enemies to have, etc.)
+        # These can be easily changed to alter level feel or difficulty
+        self.level_settings = {'points goal': (200, 400, 600),
+                               'player ship': self.player_ship_filenames,
+                               'player laser fade': (15, 15, 15),
+                               # TODO: Not working -- one getting in
+                               'enemy ship': (self.enemy_ship_filenames[0],
+                                              self.enemy_ship_filenames[0],
+                                              self.enemy_ship_filenames[1]),
+                               'starting enemies': (0, 10, 5),
+                               'enemy spawn rate': (0, .5, .5),  # per second
+                               'enemy speed range': ((50, 100), (30, 80),
+                                                     (100, 150)),
+                               # TODO: change to distance-based
+                               'enemy laser fade': (255, 40, 40),  # per frames
+                               'enemy laser reload': (10, 10, 10),
+                               'starting asteroids': (10, 0, 10),
+                               'asteroid spawn rate': (1, 0, 1),
+                               'asteroid speed range': ((50, 200), (50, 200),
+                                                        (100, 250))}
 
         # These are set up later in setup() because they're reset at each
         # death or new level
@@ -650,6 +697,12 @@ class MyGameWindow(arcade.Window):
         :return: None
         """
 
+        # TODO: keep or remove?
+        level = self.level
+
+        # Number of updates since level started
+        self.updates_this_level = 0
+
         # Set up laser lists first because they need to be passed to player
         # and enemy sprites
         self.player_laser_list = arcade.SpriteList()
@@ -665,15 +718,16 @@ class MyGameWindow(arcade.Window):
         # Set up player sprite and append to list
         # Player ship depends upon level
         # TODO: FIGURE OUT FADE RATE 15 OR 30
-        self.player_sprite = Player(self.player_ship_filenames[self.level],
+        self.player_sprite = Player(self.level_settings['player ship'][level],
                                     self.player_ship_image_scale,
                                     self.player_laser_filename,
                                     self.player_laser_image_scale,
                                     self.player_laser_list,
                                     (self.width, self.height),
-                                    laser_fade_rate=15)
+                                    laser_fade_rate=self.level_settings[
+                                        'player laser fade'][level])
 
-        self.player_sprite.center_x = self.width // 2    # TODO: REMOVE GLOBALS FROM OBJECTS
+        self.player_sprite.center_x = self.width // 2
         self.player_sprite.center_y = self.height // 2
 
         # Though the player_list only holds one sprite, using a spritelist
@@ -685,21 +739,25 @@ class MyGameWindow(arcade.Window):
 
         # TODO: MAKE NUMBER AND SPEED DEPENDENT ON LEVEL
         # Number of asteroids depends upon level
-        self.make_asteroids(10, (50, 200))    # TODO: undo numbers
+        self.make_asteroids(self.level_settings['starting asteroids'][level],
+                            self.level_settings['asteroid speed range'][level])
 
         # Number of asteroids depends upon level
-        self.make_enemy_ships(10, (50, 100))
+        self.make_enemy_ships(self.level_settings['starting enemies'][level],
+                              self.level_settings['enemy speed range'][level])
 
     def make_asteroids(self, num_asteroids, speed_range):
 
-        for i in range(num_asteroids + 1):
+        # TODO speed range (0, 0) or any single int, just make that the speed
+
+        for i in range(num_asteroids):
             asteroid = Asteroid(random.choice(self.asteroid_filenames),
                                 self.asteroid_image_scale)
 
             asteroid.set_random_offscreen_location(self.width, self.height)
 
             # Todo: base on level
-            asteroid.set_speed_in_range((speed_range[0], speed_range[1]))
+            asteroid.set_speed_in_range(speed_range)
 
             asteroid.set_random_spin()
 
@@ -710,22 +768,29 @@ class MyGameWindow(arcade.Window):
 
     def make_enemy_ships(self, num_enemies, speed_range):
 
-        for i in range(num_enemies + 1):
+        # TODO speed range (0, 0) or any single int, just make that the speed
+
+        for i in range(num_enemies):
             # Pass laser list to enemy so enemy can fill it
             # Use the first image for levels 1 and 2, then switch for level 3
-            enemy = EnemyShip(self.enemy_ship_filenames[self.level // 2],
+            enemy = EnemyShip(self.level_settings['enemy ship'][self.level],
                               self.enemy_ship_image_scale,
                               self.enemy_laser_filename,
                               self.enemy_laser_image_scale,
-                              self.enemy_laser_list)
+                              self.enemy_laser_list,
+                              laser_fade_rate=self.level_settings[
+                                  'enemy laser fade'][self.level],
+                              reload_time=self.level_settings[
+                                  'enemy laser reload'][self.level])
+
             # TODO: Give enemy lasers slower fade rate for higher level
 
             enemy.set_random_offscreen_location(self.width, self.height)
 
             # Todo: base on level
-            enemy.set_speed_in_range((speed_range[0], speed_range[1]))
+            enemy.set_speed_in_range(speed_range)
 
-            enemy.laser_speed = 3 * enemy.speed
+            enemy.laser_speed = max(3 * enemy.speed, 50)
 
             self.enemy_list.append(enemy)
 
@@ -756,7 +821,7 @@ class MyGameWindow(arcade.Window):
         # Draw writing last so it can be seen in front of everything
         arcade.draw_text("Points: {}".format(self.points), 20,
                          self.height - 30, font_size=14, bold=True)
-        arcade.draw_text("Level: {}".format(self.level), 20,
+        arcade.draw_text("Level: {}".format(self.level + 1), 20,
                          self.height - 60, font_size=14, bold=True)
 
     def on_update(self, delta_time):
@@ -765,6 +830,16 @@ class MyGameWindow(arcade.Window):
         :param delta_time:
         :return:
         """
+
+        # If points goal reached for this level, jump to the next one
+        if self.points >= self.level_settings['points goal'][self.level]:
+            self.level += 1
+            if self.level <= 2:
+                self.setup()
+
+
+        # Count updates since level started
+        self.updates_this_level += 1
 
         # Check collisions first because we'll delete sprites based on these
         # collisions and want them to have visually overlapped in the last
@@ -777,10 +852,15 @@ class MyGameWindow(arcade.Window):
         # case of the player and a laser both hitting a asteroid, the player
         # dies
         # If the player collides with any other sprite, they die
-        hits = arcade.check_for_collision_with_lists(self.player_sprite,
-                                                     [self.asteroid_list,
-                                                      self.enemy_laser_list,
-                                                      self.enemy_list])
+        # Use sprite list to check instead of self.player_sprite so that
+        # collisions don't get checked if player dies and is removed from list
+        hits = []
+        for player in self.player_list:
+            h = arcade.check_for_collision_with_lists(player,
+                                                      [self.asteroid_list,
+                                                       self.enemy_laser_list,
+                                                       self.enemy_list])
+            hits += h
 
         if hits:
             # Decrement lives left
@@ -873,11 +953,19 @@ class MyGameWindow(arcade.Window):
         # is pressed
         self.player_sprite.shooting = self.space_pressed
 
+
+        # TODO: Undo this -- it's okay for them to stand still
         # Set enemies' new target point as player's current (soon-to-be-old)
         # location
-        for enemy in self.enemy_list:
-            enemy.set_target(self.player_sprite.center_x,
-                             self.player_sprite.center_y)
+        if len(self.player_list) >= 1:
+            for enemy in self.enemy_list:
+                enemy.set_target(self.player_sprite.center_x,
+                                 self.player_sprite.center_y)
+        # If player has been removed from list (been killed), set enemies'
+        # targets to their current points so they keep moving
+        else:
+            for enemy in self.enemy_list:
+                enemy.set_target(enemy.center_x, enemy.center_y)
 
         self.player_list.on_update(delta_time)
         self.player_laser_list.on_update(delta_time)
@@ -893,9 +981,10 @@ class MyGameWindow(arcade.Window):
                                        or modifiers == arcade.key.MOD_CTRL):
             arcade.close_window()
 
-        # Restart program
+        # Restart program, TODO also reset to level 1
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
+            self.points = 0
             self.setup()
 
         if symbol == arcade.key.RIGHT:
@@ -909,6 +998,19 @@ class MyGameWindow(arcade.Window):
 
         if symbol == arcade.key.SPACE:
             self.space_pressed = True
+
+        # For "cheating," jumping to a different level
+        if symbol == arcade.key.KEY_1 and modifiers == arcade.key.MOD_COMMAND:
+            self.level = 0
+            self.setup()
+
+        if symbol == arcade.key.KEY_2 and modifiers == arcade.key.MOD_COMMAND:
+            self.level = 1
+            self.setup()
+
+        if symbol == arcade.key.KEY_3 and modifiers == arcade.key.MOD_COMMAND:
+            self.level = 2
+            self.setup()
 
         # # TODO: DELETE -- JUST USED FOR DEBUGGING
         # if symbol == arcade.key.P:
