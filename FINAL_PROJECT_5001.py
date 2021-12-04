@@ -17,6 +17,7 @@ Practice:
 
 TODO:
     - clean up (eg basic enemy from which asteroids and enemy ships descend)
+    - no filenames or globals hardcoded into classes other than MyGameWindow.
     - add add damage
     - implement strings
     - differing functions for resetting for new game and resetting for level
@@ -250,6 +251,93 @@ class TargetingSprite(arcade.Sprite):
     def set_target(self, x, y):
         self.target_x = x
         self.target_y = y
+
+    def set_random_offscreen_location(self, screen_width, screen_height):
+        # Get coordinates of random point offscreen by getting a random
+        # x and a corresponding y that makes it work
+
+        # x can be anywhere in the width of the screen, and a little to
+        # the left or right
+        x = random.randrange(screen_width // -2, 3 * screen_height // 2)
+
+        # If x coordinate is within range of visible x's, place
+        # y-coordinate offscreen
+        if -self.diagonal // 2 <= x <= screen_width + self.diagonal // 2:
+
+            # Whether y will be above or below screen
+            y_sign = random.choice([1, -1])
+
+            # How far away from edge of screen y will be
+            y_offset = random.randrange(self.diagonal, 5 * self.diagonal)
+
+            # Place y above or below edge of screen
+            if y_sign > 0:
+                y = screen_height + y_offset
+            else:
+                y = -y_offset
+
+        # If x-coordinate is offscreen, place y-coordinate within,
+        # range of visible y-coordinates, or a little beyond
+        else:
+            y = random.randrange(-self.diagonal, screen_height + self.diagonal)
+
+        self.center_x = x
+        self.center_y = y
+
+    def set_speed_in_range(self, speed_range: tuple):
+
+        # Validate parameters
+        if not isinstance(speed_range, tuple):
+            raise TypeError("Speed range must be a 2- or 3-tuple")
+        if not 2 <= len(speed_range) <= 3:
+            raise ValueError("Speed range must have length 2 or 3")
+        for num in speed_range:
+            if not isinstance(num, int):
+                raise TypeError("Speed range's elements must be integers")
+
+        # Set step
+        if len(speed_range) == 2:
+            step = 1
+        else:
+            step = speed_range[2]
+
+        self.speed = random.randrange(speed_range[0], speed_range[1], step)
+
+    # TODO: currently only used for Asteroid, but doesn't hurt to have for all
+    def set_random_spin(self, speed_range: tuple = (-5, 6, 2)):
+        # Validate parameters
+        if not isinstance(speed_range, tuple):
+            raise TypeError("Speed range must be a 2- or 3-tuple")
+        if not 2 <= len(speed_range) <= 3:
+            raise ValueError("Speed range must have length 2 or 3")
+        for num in speed_range:
+            if not isinstance(num, int):
+                raise TypeError("Speed range's elements must be integers")
+
+        # Set step
+        if len(speed_range) == 2:
+            step = 1
+        else:
+            step = speed_range[2]
+
+        self.change_angle = random.randrange(speed_range[0], speed_range[1],
+                                             step)
+
+    # TODO: currently only used for Asteroid, but doesn't hurt to have for all
+    def set_random_cross_screen_target(self, screen_width, screen_height):
+        if self.center_x < 0:
+            self.target_x = screen_width + self.diagonal
+        elif self.center_x > screen_width:
+            self.target_x = -self.diagonal
+        else:
+            self.target_x = random.randrange(screen_width)
+
+        if self.center_y < 0:
+            self.target_y = screen_height + self.diagonal
+        elif self.center_y > SCREEN_HEIGHT:
+            self.target_y = -self.diagonal
+        else:
+            self.target_y = random.randrange(screen_height)
 
 
 class Asteroid(TargetingSprite):
@@ -491,128 +579,36 @@ class MyGameWindow(arcade.Window):
 
     def make_asteroids(self, num_asteroids, speed_range):
 
-        # TODO: Start them way closer to edge of screen
         for i in range(num_asteroids + 1):
             asteroid = Asteroid(random.choice(self.asteroid_images))
 
-            # TODO: MOVE THIS LATER -- AT END WOULD BE EASIER
-            self.asteroid_list.append(asteroid)
+            asteroid.set_random_offscreen_location(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-            # Get coordinates of random point offscreen by getting a random
-            # x and a corresponding y that makes it work
-            diagonal = self.asteroid_list[-1].diagonal
+            # Todo: base on level
+            asteroid.set_speed_in_range((speed_range[0], speed_range[1]))
 
-            # x can be anywhere in the width of the screen, and a little to
-            # the left or right
-            x = random.randrange(SCREEN_WIDTH // -2, 3 * SCREEN_WIDTH // 2)
-
-            # If x coordinate is within range of visible x's, place
-            # y-coordinate offscreen
-            if -diagonal // 2 <= x <= SCREEN_WIDTH + diagonal // 2:
-
-                # Whether y will be above or below screen
-                y_sign = random.choice([1, -1])
-
-                # How far away from edge of screen y will be
-                y_offset = random.randrange(diagonal, 5 * diagonal)
-
-                # Place y above or below edge of screen
-                if y_sign > 0:
-                    y = SCREEN_HEIGHT + y_offset
-                else:
-                    y = -y_offset
-
-            # If x-coordinate is offscreen, place y-coordinate within,
-            # range of visible y-coordinates, or a little beyond
-            else:
-                y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
-
-            # Set coordinates of asteroid
-            self.asteroid_list[-1].center_x = x
-            self.asteroid_list[-1].center_y = y
-
-            # Set random speed of asteroid within range
-            self.asteroid_list[-1].speed = random.randrange(speed_range[0],
-                                                            speed_range[1])
-
-            # Set random spin rate for asteroid, avoiding zero
-            self.asteroid_list[-1].change_angle = random.randrange(-5, 6, 2)
+            asteroid.set_random_spin()
 
             # Set random target point for asteroid across screen
+            asteroid.set_random_cross_screen_target(SCREEN_WIDTH,
+                                                    SCREEN_HEIGHT)
 
-            #
-            if x < 0:
-                target_x = SCREEN_WIDTH + diagonal
-            elif x > SCREEN_WIDTH:
-                target_x = -diagonal
-            else:
-                target_x = random.randrange(SCREEN_WIDTH)
+            self.asteroid_list.append(asteroid)
 
-            #
-            if y < 0:
-                target_y = SCREEN_HEIGHT + diagonal
-            elif y > SCREEN_HEIGHT:
-                target_y = -diagonal
-            else:
-                target_y = random.randrange(SCREEN_HEIGHT)
-
-            self.asteroid_list[-1].target_x = target_x
-            self.asteroid_list[-1].target_y = target_y
-
-
-
-
-    # TODO: THIS IS THE SAME AS MAKE_ASTEROIDS SO MAKE AS ONE FUNCTION
-    # TODO: make most of this a setup method for sprite
     def make_enemy_ships(self, num_enemies, speed_range):
 
-        # TODO: Start them way closer to edge of screen
         for i in range(num_enemies + 1):
             # Pass laser list to enemy so enemy can fill it
-            self.enemy_list.append(EnemyShip(self.enemy_ship_images[0],
-                                   self.enemy_laser_list))
+            enemy = EnemyShip(self.enemy_ship_images[0], self.enemy_laser_list)
 
-            # Get diagonal size of enemy_ship to hide it offscreen
-            diagonal = self.enemy_list[-1].diagonal
+            enemy.set_random_offscreen_location(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-            # Get coordinates of random point offscreen by getting a random
-            # x and a corresponding y that makes it work
+            # Todo: base on level
+            enemy.set_speed_in_range((speed_range[0], speed_range[1]))
 
-            # x can be anywhere in the width of the screen, and a little to
-            # the left or right
-            x = random.randrange(SCREEN_WIDTH // -2, 3 * SCREEN_WIDTH // 2)
+            enemy.laser_speed = 3 * enemy.speed
 
-            # If x coordinate is within range of visible x's, place
-            # y-coordinate offscreen
-            if -diagonal // 2 <= x <= SCREEN_WIDTH + diagonal // 2:
-
-                # Whether y will be above or below screen
-                y_sign = random.choice([1, -1])
-
-                # How far away from edge of screen y will be
-                y_offset = random.randrange(diagonal, 5 * diagonal)
-
-                # Place y above or below edge of screen
-                if y_sign > 0:
-                    y = SCREEN_HEIGHT + y_offset
-                else:
-                    y = -y_offset
-
-            # If x-coordinate is offscreen, place y-coordinate within,
-            # range of visible y-coordinates, or a little beyond
-            else:
-                y = random.randrange(-diagonal, SCREEN_HEIGHT + diagonal)
-
-            # Set coordinates of asteroid
-            self.enemy_list[-1].center_x = x
-            self.enemy_list[-1].center_y = y
-
-            # Set random speed of asteroid within range
-            self.enemy_list[-1].speed = random.randrange(speed_range[0],
-                                                         speed_range[1])
-
-            # TODO: CHANGE THIS TO BE BASED ON LEVEL
-            self.enemy_list[-1].laser_speed = 3 * self.enemy_list[-1].speed
+            self.enemy_list.append(enemy)
 
 
     def on_draw(self):
@@ -705,6 +701,7 @@ class MyGameWindow(arcade.Window):
 
         # Add points for each hit
         # TODO: should different sizes earn different points?
+        #  Using generator or list comprehension (https://docs.python.org/3/tutorial/classes.html)
         self.points += ASTEROID_POINTS * len(asteroids_hit)
         self.points += ENEMY_POINTS * len(enemies_hit)
 
