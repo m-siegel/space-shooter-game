@@ -43,8 +43,6 @@ TODO:
         - add end screen
     ------------------------------------
     STYLE
-        - type hints
-        - __str__ to all
         - DEFENSIVE PROGRAMMING (at least in the method params, not name mangling)
         - PEP8 COMPLIANCE
         - general structure
@@ -72,7 +70,8 @@ DONE:
     - add levels and design levels
         - add shortcuts (cmd 1, cmd 2, cmd 3)
     - add sounds
-
+    - type hints
+    - __str__ to all
 """
 
 
@@ -281,6 +280,12 @@ class Player(arcade.Sprite):
         else:
             self.reload_ticks -= 1
 
+    def __str__(self) -> str:
+        return ("<Player: center_x = {}, center_y = {}, speed = {}, "
+                "angle = {}, change_x = {}, change_y = {}>".format(
+                    self.center_x, self.center_y, self.speed, self.angle,
+                    self.change_x, self.change_y))
+
 
 class Laser(arcade.Sprite):
     # TODO: maybe a list of bullet speeds at different levels
@@ -337,6 +342,12 @@ class Laser(arcade.Sprite):
                 self.alpha -= self.fade_rate // 3
             except ValueError:
                 self.remove_from_sprite_lists()
+
+    def __str__(self) -> str:
+        return ("<Laser: center_x = {}, center_y = {}, speed = {}, "
+                "change_x = {}, change_y = {}, fade_rate = {}>".format(
+                    self.center_x, self.center_y, self.speed, self.change_x,
+                    self.change_y, self.fade_rate))
 
 
 class TargetingSprite(arcade.Sprite):
@@ -503,6 +514,14 @@ class TargetingSprite(arcade.Sprite):
         else:
             self.target_y = random.randrange(screen_height)
 
+    def __str__(self) -> str:
+        return ("<TargetingSprite: center_x = {}, center_y = {}, speed = {}, "
+                "target_x = {}, target_y = {}, change_x = {},"
+                " change_y = {}>".format(self.center_x, self.center_y,
+                                         self.speed, self.target_x,
+                                         self.target_y, self.change_x,
+                                         self.change_y))
+
 
 class Asteroid(TargetingSprite):
     # TODO: what if initialized without image so random one could be chosen in
@@ -526,12 +545,12 @@ class Asteroid(TargetingSprite):
             self.remove_from_sprite_lists()
 
     def __str__(self) -> str:
-        return ("Asteroid: center_x = {}, center_y = {}, speed = {}, "
+        return ("<Asteroid: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
-                " change_y = {}".format(self.center_x, self.center_y,
-                                        self.speed, self.target_x,
-                                        self.target_y, self.change_x,
-                                        self.change_y))
+                " change_y = {}>".format(self.center_x, self.center_y,
+                                         self.speed, self.target_x,
+                                         self.target_y, self.change_x,
+                                         self.change_y))
 
 
 class EnemyShip(TargetingSprite):
@@ -585,6 +604,14 @@ class EnemyShip(TargetingSprite):
             # TODO: fix this...
             self.reload_time = self.laser_speed
 
+    def __str__(self) -> str:
+        return ("<EnemyShip: center_x = {}, center_y = {}, speed = {}, "
+                "target_x = {}, target_y = {}, change_x = {},"
+                " change_y = {}, laser_speed = {}, reload_time = {}>".format(
+                    self.center_x, self.center_y, self.speed, self.target_x,
+                    self.target_y, self.change_x, self.change_y,
+                    self.laser_speed, self.reload_time))
+
 
 class Explosion(arcade.Sprite):
     """
@@ -623,6 +650,11 @@ class Explosion(arcade.Sprite):
         # Remove from lists
         else:
             self.remove_from_sprite_lists()
+
+    def __str__(self) -> str:
+        return ("<Explosion: center_x = {}, center_y = {},"
+                "number of textures = {}>".format(self.center_x, self.center_y,
+                                                  len(self.textures)))
 
 
 class MyGameWindow(arcade.Window):
@@ -1245,6 +1277,19 @@ class MyGameWindow(arcade.Window):
 
         if symbol == arcade.key.SPACE:
             self.space_pressed = False
+
+    def __str__(self) -> str:
+        return ("<MyGameWindow: width = {}, height = {}, player_location = {},"
+                " num EnemyShips = {}, num Asteroids = {},"
+                " num player lasers = {}, num enemy lasers = {},"
+                " num explosions = {}>".format(self.width, self.height,
+                                               (self.player_sprite.center_x,
+                                                self.player_sprite.center_y),
+                                               len(self.enemy_list),
+                                               len(self.asteroid_list),
+                                               len(self.player_laser_list),
+                                               len(self.enemy_laser_list),
+                                               len(self.explosion_list)))
 
 
 def textures_from_spritesheet(filename: str, texture_width: int,
