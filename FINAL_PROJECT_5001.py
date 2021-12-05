@@ -44,6 +44,7 @@ TODO:
     ------------------------------------
     STYLE
         - type hints
+        - __str__ to all
         - DEFENSIVE PROGRAMMING (at least in the method params, not name mangling)
         - PEP8 COMPLIANCE
         - general structure
@@ -79,7 +80,7 @@ import arcade
 import math
 import random
 
-from typing import List, Tuple, Union  # For type hinting
+from typing import List, Tuple, Union, Optional  # For type hinting
 
 SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 800
@@ -174,10 +175,12 @@ class Player(arcade.Sprite):
     METHODS used (see arcade.Sprite for other, unused methods):
     """
 
-    # TODO: update caller to send laser_filename and laser_list
-    def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, window_dims, laser_fade_rate=15,
-                 laser_sound=None):
+    # TODO: get speed? for enemies and ateroids, too?
+    def __init__(self, image_filename: str, scale: Union[int, float],
+                 laser_filename: str, laser_scale: Union[int, float],
+                 laser_list: arcade.SpriteList, window_dims: Tuple[int, int],
+                 laser_fade_rate: Union[int, float] = 15,
+                 laser_sound: Optional[arcade.Sound] = None):
         super().__init__(filename=image_filename, scale=scale)
         """
         Constructor. Sets attributes self.speed, self.angle_rate and 
@@ -226,7 +229,7 @@ class Player(arcade.Sprite):
 
         self.laser_sound = laser_sound
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> None:
         """
         Updates sprite's position by changing angle, center_x and center_y to
         animate sprite. Should be called at least 30 times per second.
@@ -281,8 +284,11 @@ class Player(arcade.Sprite):
 
 class Laser(arcade.Sprite):
     # TODO: maybe a list of bullet speeds at different levels
-    def __init__(self,  x, y, image_filename, scale, angle=0, speed=200,
-                 fade_rate=0, sound=None):
+    def __init__(self,  x: Union[int, float], y: Union[int, float],
+                 image_filename: str, scale: Union[int, float],
+                 angle: Union[int, float] = 0, speed: Union[int, float] = 200,
+                 fade_rate: Union[int, float] = 0,
+                 sound: Optional[arcade.Sound] = None):
         super().__init__(filename=image_filename, scale=scale, center_x=x,
                          center_y=y, angle=angle, )
 
@@ -308,7 +314,7 @@ class Laser(arcade.Sprite):
         if self.sound:
             self.player = sound.play()
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> None:
         # used to track when to spawn laser and when it should die
         self.frames += 1
         # Always move in the same direction at the same rate
@@ -334,7 +340,9 @@ class Laser(arcade.Sprite):
 
 
 class TargetingSprite(arcade.Sprite):
-    def __init__(self, image_filename, scale, target_x=0, target_y=0):
+    def __init__(self, image_filename: str, scale: Union[int, float],
+                 target_x: Union[int, float] = 0,
+                 target_y: Union[int, float] = 0):
         super().__init__(filename=image_filename, scale=scale)
 
         # Initialize speed to not moving
@@ -353,7 +361,7 @@ class TargetingSprite(arcade.Sprite):
         # any angle
         self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> float:
         # Get x and y distance to target from current position
         x_distance = self.target_x - self.center_x
         y_distance = self.target_y - self.center_y
@@ -399,11 +407,12 @@ class TargetingSprite(arcade.Sprite):
         return angle_rad
 
     # TODO: unique to EnemyShip, but okay for both to have, necessary to neither
-    def set_target(self, x, y):
+    def set_target(self, x: Union[int, float], y: Union[int, float]) -> None:
         self.target_x = x
         self.target_y = y
 
-    def set_random_offscreen_location(self, screen_width, screen_height):
+    def set_random_offscreen_location(self, screen_width: int,
+                                      screen_height: int) -> None:
         # Get coordinates of random point offscreen by getting a random
         # x and a corresponding y that makes it work
 
@@ -435,7 +444,9 @@ class TargetingSprite(arcade.Sprite):
         self.center_x = x
         self.center_y = y
 
-    def set_speed_in_range(self, speed_range: tuple):
+    def set_speed_in_range(self,
+                           speed_range: Union[Tuple[int, int],
+                                              Tuple[int, int, int]]) -> None:
 
         # Validate parameters
         if not isinstance(speed_range, tuple):
@@ -456,7 +467,7 @@ class TargetingSprite(arcade.Sprite):
         self.speed = random.randrange(speed_range[0], speed_range[1], step)
 
     # TODO: currently only used for Asteroid, but doesn't hurt to have for all
-    def set_random_spin(self, speed_range: tuple = (-5, 6, 2)):
+    def set_random_spin(self, speed_range: tuple = (-5, 6, 2)) -> None:
         # Validate parameters
         if not isinstance(speed_range, tuple):
             raise TypeError("Speed range must be a 2- or 3-tuple")
@@ -476,7 +487,8 @@ class TargetingSprite(arcade.Sprite):
                                              step)
 
     # TODO: currently only used for Asteroid, but doesn't hurt to have for all
-    def set_random_cross_screen_target(self, screen_width, screen_height):
+    def set_random_cross_screen_target(self, screen_width: int,
+                                       screen_height: int) -> None:
         if self.center_x < 0:
             self.target_x = screen_width + self.diagonal
         elif self.center_x > screen_width:
@@ -496,14 +508,14 @@ class Asteroid(TargetingSprite):
     # TODO: what if initialized without image so random one could be chosen in
     #  setup? Or, could random one be chosen here and then super's init called?
     #  Could the list of meteor images be a class variable first? Or global?
-    def __init__(self, image_filename, scale):
+    def __init__(self, image_filename: str, scale: Union[int, float]):
         super().__init__(image_filename, scale)
 
         # TODO: don't think is necessary since sprite has
         # Set spinning at random rate
         self.change_angle = 0
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> None:
         super().on_update(delta_time)
 
         # Spin asteroid
@@ -513,8 +525,7 @@ class Asteroid(TargetingSprite):
         if self.center_x == self.target_x and self.center_y == self.target_y:
             self.remove_from_sprite_lists()
 
-    # TODO: DELETE (JUST FOR DEBUGGING)
-    def __repr__(self):
+    def __str__(self) -> str:
         return ("Asteroid: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
                 " change_y = {}".format(self.center_x, self.center_y,
@@ -524,9 +535,12 @@ class Asteroid(TargetingSprite):
 
 
 class EnemyShip(TargetingSprite):
-    def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, laser_fade_rate=40, reload_time=10,
-                 laser_sound=None):
+    def __init__(self, image_filename: str, scale: Union[int, float],
+                 laser_filename: str, laser_scale: Union[int, float],
+                 laser_list: arcade.SpriteList,
+                 laser_fade_rate: Union[int, float] = 40,
+                 reload_time: int = 10,
+                 laser_sound: Optional[arcade.Sound] = None):
         # TODO: commentary on why inheriting from BasicEnemy?
         super().__init__(image_filename, scale)
 
@@ -546,7 +560,7 @@ class EnemyShip(TargetingSprite):
 
         self.laser_sound = laser_sound
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> None:
         # Moves sprite towards target point at speed, returns angle to target
         angle_rad = super().on_update(delta_time)  # TODO: is the argument necessary?
 
@@ -577,7 +591,10 @@ class Explosion(arcade.Sprite):
     Creates a sprite and animates it once in place with textures, then
     disappears.
     """
-    def __init__(self, textures, center_x, center_y, scale=1, sound=None):
+    def __init__(self, textures: List[arcade.Texture],
+                 center_x: Union[int, float], center_y: Union[int, float],
+                 scale: Union[int, float] = 1,
+                 sound: Optional[arcade.Sound] = None):
 
         # Initialize from super without images
         super().__init__(center_x=center_x, center_y=center_y, scale=scale)
@@ -719,7 +736,6 @@ class MyGameWindow(arcade.Window):
         # Not needed; don't do check if sound is playing or stop it
         self.game_over_player = None
 
-
         # Key press info
         self.left_pressed = False
         self.right_pressed = False
@@ -734,24 +750,23 @@ class MyGameWindow(arcade.Window):
         # Game level settings store specific settings (which ship image to
         # use, how many asteroids or enemies to have, etc.)
         # These can be easily changed to alter level feel or difficulty
-        self.level_settings = {'points goal': (100, 200, 300),
-                               'player ship': self.player_ship_filenames,
-                               'player laser fade': (15, 15, 15),
-                               # TODO: Not working -- one getting in
-                               'enemy ship': (self.enemy_ship_filenames[0],
-                                              self.enemy_ship_filenames[0],
-                                              self.enemy_ship_filenames[1]),
-                               'starting enemies': (0, 10, 5),
-                               'enemy spawn rate': (0, .5, .5),  # per second
-                               'enemy speed range': ((50, 100), (30, 80),
-                                                     (80, 130)),
-                               # TODO: change to distance-based -- right now there's something with max()
-                               'enemy laser fade': (255, 40, 40),  # per frames
-                               'enemy laser reload': (10, 10, 10),
-                               'starting asteroids': (10, 0, 10),
-                               'asteroid spawn rate': (1, 0, 1),
-                               'asteroid speed range': ((50, 200), (50, 200),
-                                                        (100, 200))}
+        self.level_settings = {
+            'points goal': (100, 200, 300),
+            'player ship': self.player_ship_filenames,
+            'player laser fade': (15, 15, 15),
+            # Keep same enemy ships for first two levels
+            'enemy ship': (self.enemy_ship_filenames[0],
+                           self.enemy_ship_filenames[0],
+                           self.enemy_ship_filenames[1]),
+            'starting enemies': (0, 10, 5),
+            'enemy spawn rate': (0, .5, .5),  # per second
+            'enemy speed range': ((50, 100), (30, 80), (80, 130)),
+            # TODO: change to distance-based -- right now there's something with max()
+            'enemy laser fade': (255, 40, 40),  # per frames
+            'enemy laser reload': (10, 10, 10),
+            'starting asteroids': (10, 0, 10),
+            'asteroid spawn rate': (1, 0, 1),
+            'asteroid speed range': ((50, 200), (50, 200), (100, 200))}
 
         self.asteroids_spawning = None
         self.enemies_spawning = None
@@ -776,7 +791,7 @@ class MyGameWindow(arcade.Window):
         # TODO: initial setup vs reset at death or new level
         self.setup()
 
-    def setup(self):
+    def setup(self) -> None:
         """
         Sets or resets game when the window is opened or the game is
         restarted.
@@ -798,7 +813,6 @@ class MyGameWindow(arcade.Window):
         # TODO: for debugging
         # if self.level > 0:
         #     self.background_music_sound.stop(self.background_music_player)
-
 
         # TODO: keep or remove?
         level = self.level
@@ -828,6 +842,9 @@ class MyGameWindow(arcade.Window):
         # Set up player sprite and append to list
         # Player ship depends upon level
         # TODO: FIGURE OUT FADE RATE 15 OR 30
+        # PyCharm is confused by this first element because it comes from
+        # a dictionary whose first value is a tuple of ints and PyCharm thinks
+        # all values from that dict are int tuples, but this is a string
         self.player_sprite = Player(self.level_settings['player ship'][level],
                                     self.player_ship_image_scale,
                                     self.player_laser_filename,
@@ -857,7 +874,9 @@ class MyGameWindow(arcade.Window):
         self.make_enemy_ships(self.level_settings['starting enemies'][level],
                               self.level_settings['enemy speed range'][level])
 
-    def make_asteroids(self, num_asteroids, speed_range):
+    def make_asteroids(self, num_asteroids: int,
+                       speed_range: Union[Tuple[int, int],
+                                          Tuple[int, int, int]]) -> None:
 
         # TODO speed range (0, 0) or any single int, just make that the speed
 
@@ -877,7 +896,9 @@ class MyGameWindow(arcade.Window):
 
             self.asteroid_list.append(asteroid)
 
-    def make_enemy_ships(self, num_enemies, speed_range):
+    def make_enemy_ships(self, num_enemies: int,
+                         speed_range: Union[Tuple[int, int],
+                                            Tuple[int, int, int]]) -> None:
 
         # TODO speed range (0, 0) or any single int, just make that the speed
 
@@ -906,7 +927,9 @@ class MyGameWindow(arcade.Window):
 
             self.enemy_list.append(enemy)
 
-    def on_draw(self):
+    # TODO: I THINK these and other window methods return None since I don't
+    #  return anything, but I also don't call them, so I'm not entirely sure
+    def on_draw(self) -> None:
 
         # This clears the screen for the following drawings to work
         arcade.start_render()
@@ -939,7 +962,7 @@ class MyGameWindow(arcade.Window):
         arcade.draw_text("Extra Lives: {}".format(self.lives), 20,
                          self.height - 90, font_size=14, bold=True)
 
-    def on_update(self, delta_time):
+    def on_update(self, delta_time):    # Super's signature doesn't type hint
         """
         Main game logic
         :param delta_time:
@@ -1116,7 +1139,7 @@ class MyGameWindow(arcade.Window):
             if self.asteroids_spawning > 0:
                 self.asteroids_spawning -= 1
             else:
-                self.make_asteroids(1, self.level_settings[
+                self.make_asteroids(1, self.level_settings[    # PyCharm's confused
                     'asteroid speed range'][self.level])
                 self.asteroids_spawning = 60 // self.level_settings[
                     'asteroid spawn rate'][self.level]
@@ -1124,7 +1147,7 @@ class MyGameWindow(arcade.Window):
             if self.enemies_spawning > 0:
                 self.enemies_spawning -= 1
             else:
-                self.make_enemy_ships(1, self.level_settings[
+                self.make_enemy_ships(1, self.level_settings[    # PyCharm's confused
                     'enemy speed range'][self.level])
                 self.enemies_spawning = 60 // self.level_settings[
                     'enemy spawn rate'][self.level]
@@ -1153,7 +1176,8 @@ class MyGameWindow(arcade.Window):
         self.enemy_laser_list.on_update(delta_time)
         self.explosion_list.update()
 
-    def on_key_press(self, symbol, modifiers):
+    # TODO: Not sure about return vals....
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
         # Gracefully quit program
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -1208,7 +1232,7 @@ class MyGameWindow(arcade.Window):
         #         print(asteroid)
         #     print("-" * 50)
 
-    def on_key_release(self, symbol, modifiers):
+    def on_key_release(self, symbol: int, modifiers: int) -> None:
 
         if symbol == arcade.key.RIGHT:
             self.right_pressed = False
@@ -1221,9 +1245,6 @@ class MyGameWindow(arcade.Window):
 
         if symbol == arcade.key.SPACE:
             self.space_pressed = False
-            # Reset reloading so repeatedly hitting space gives player
-            # potential to shoot faster
-            self.reloading = 0
 
 
 def textures_from_spritesheet(filename: str, texture_width: int,
@@ -1346,4 +1367,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
