@@ -39,10 +39,6 @@ Practice:
     - spawning (already done, but can check how they do)
 
 TODO:
-    - differing functions for resetting for new game and resetting for level (eg when points should be reset)
-    - add levels and design levels
-        - add shortcuts (cmd 1, cmd 2, cmd 3)
-    - add sounds
     - add start screen
         - add end screen
     ------------------------------------
@@ -71,6 +67,10 @@ DONE:
     - clean up (eg basic enemy from which asteroids and enemy ships descend)
     - no filenames or globals hardcoded into classes other than MyGameWindow.
     - figure out why enemy lasers shoot long when they first start
+    - differing functions for resetting for new game and resetting for level (eg when points should be reset)
+    - add levels and design levels
+        - add shortcuts (cmd 1, cmd 2, cmd 3)
+    - add sounds
 
 """
 
@@ -99,39 +99,57 @@ ENEMY_POINTS = 15
 IMAGE_SCALE = .5
 
 # Player ship filenames (3 strign filenames: one for each level)
-PLAYER_SHIPS = ("spaceshooter/PNG/Player_ships/playerShip1_blue.png",
-                "spaceshooter/PNG/Player_ships/playerShip2_blue.png",
-                "spaceshooter/PNG/Player_ships/playerShip3_blue.png")
+PLAYER_SHIPS = ("media/kenney_nl/spaceshooter/PNG/"
+                "Player_ships/playerShip1_blue.png",
+                "media/kenney_nl/spaceshooter/PNG/"
+                "Player_ships/playerShip2_blue.png",
+                "media/kenney_nl/spaceshooter/PNG/"
+                "Player_ships/playerShip3_blue.png")
 # In case image needs unique scaling
 PLAYER_SHIP_SCALE = IMAGE_SCALE
 
 # Player laser filename (one string)
-PLAYER_LASER = "spaceshooter/PNG/Lasers/laserBlue01.png"
+PLAYER_LASER = "media/kenney_nl/spaceshooter/PNG/Lasers/laserBlue01.png"
 # In case image needs unique scaling
 PLAYER_LASER_SCALE = IMAGE_SCALE
 
 
 # Enemy Ship filenames (2 filename strings: one for each of levels 2 and 3)
-ENEMY_SHIPS = ("spaceshooter/PNG/Enemies/enemyRed1.png",
-               "spaceshooter/PNG/Enemies/enemyRed2.png")
+ENEMY_SHIPS = ("media/kenney_nl/spaceshooter/PNG/Enemies/enemyRed1.png",
+               "media/kenney_nl/spaceshooter/PNG/Enemies/enemyRed2.png")
 ENEMY_SHIP_SCALE = IMAGE_SCALE
 
 # Used in main() to get variations on base filename using iteration
 # For example, "spaceshooter/PNG/Meteors/meteorBrown_big3.png"
 # NOTE: main expects 4 files named big 1-4, 2 files names med, 2 named small,
 # and 2 named tiny
-ASTEROID_FILENAME_BASE = "spaceshooter/PNG/Meteors/meteorBrown_{}.png"
+ASTEROID_FILENAME_BASE = ("media/kenney_nl/spaceshooter/PNG/"
+                          "Meteors/meteorBrown_{}.png")
 ASTEROID_SCALE = 1
 
 # Enemy laser filename (one string)
-ENEMY_LASER = "spaceshooter/PNG/Lasers/laserRed01.png"
+ENEMY_LASER = "media/kenney_nl/spaceshooter/PNG/Lasers/laserRed01.png"
 ENEMY_LASER_SCALE = IMAGE_SCALE
 
 # Explosion textures are stored in a grid in a spritesheet
-EXPLOSION_FILE = {"filename": "explosion.png", "texture_width": 256,
+EXPLOSION_FILE = {"filename": "media/explosion.png", "texture_width": 256,
                   "texture_height": 256, "columns": 16,
                   "num_textures": 221}
 EXPLOSION_SCALE = 1
+# Since the file has so many textures, only include one out of every two
+# for a shorter animation
+EXPLOSION_SKIP_RATE = 2
+
+
+# TODO: ASK -- better as a dictionary?
+BACKGROUND_SOUND = "media/imovie_sound_effect_space_log.wav"
+PLAYER_LASER_SOUND = "media/kenney_nl/sounds/laser2.wav"
+ENEMY_LASER_SOUND = "media/kenney_nl/sounds/laser1.mp3"
+EXPLOSION_SOUND = "media/kenney_nl/sounds/explosion2.wav"
+LEVEL_UP_SOUND = "media/kenney_nl/sounds/upgrade1.wav"
+LOST_LIFE_SOUND = "media/kenney_nl/sounds/lose5.wav"
+GAME_OVER_SOUND = "media/kenney_nl/sounds/gameover1.wav"
+WIN_SOUND = "media/imovie_sound_effects_broadcast_news_short.wav"
 
 
 class Player(arcade.Sprite):
@@ -158,7 +176,8 @@ class Player(arcade.Sprite):
 
     # TODO: update caller to send laser_filename and laser_list
     def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, window_dims, laser_fade_rate=15):
+                 laser_list, window_dims, laser_fade_rate=15,
+                 laser_sound=None):
         super().__init__(filename=image_filename, scale=scale)
         """
         Constructor. Sets attributes self.speed, self.angle_rate and 
@@ -205,6 +224,7 @@ class Player(arcade.Sprite):
         self.window_width = window_dims[0]
         self.window_height = window_dims[1]
 
+        self.laser_sound = laser_sound
 
     def on_update(self, delta_time: float = 1 / 60):
         """
@@ -251,7 +271,9 @@ class Player(arcade.Sprite):
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          self.laser_filename, self.laser_scale,
                                          angle=self.angle,
-                                         fade_rate=self.laser_fade_rate))
+                                         speed=400,    # TODO: variable
+                                         fade_rate=self.laser_fade_rate,
+                                         sound=self.laser_sound))
             self.reload_ticks = self.reload_time
         else:
             self.reload_ticks -= 1
@@ -260,7 +282,7 @@ class Player(arcade.Sprite):
 class Laser(arcade.Sprite):
     # TODO: maybe a list of bullet speeds at different levels
     def __init__(self,  x, y, image_filename, scale, angle=0, speed=200,
-                 fade_rate=0):
+                 fade_rate=0, sound=None):
         super().__init__(filename=image_filename, scale=scale, center_x=x,
                          center_y=y, angle=angle, )
 
@@ -279,6 +301,12 @@ class Laser(arcade.Sprite):
 
         # How quickly the laser should disappear
         self.fade_rate = fade_rate
+
+        # Optionally play sound (if one is sent)
+        self.sound = sound
+        self.player = None
+        if self.sound:
+            self.player = sound.play()
 
     def on_update(self, delta_time: float = 1 / 60):
         # used to track when to spawn laser and when it should die
@@ -497,7 +525,8 @@ class Asteroid(TargetingSprite):
 
 class EnemyShip(TargetingSprite):
     def __init__(self, image_filename, scale, laser_filename, laser_scale,
-                 laser_list, laser_fade_rate=40, reload_time=10):
+                 laser_list, laser_fade_rate=40, reload_time=10,
+                 laser_sound=None):
         # TODO: commentary on why inheriting from BasicEnemy?
         super().__init__(image_filename, scale)
 
@@ -514,6 +543,8 @@ class EnemyShip(TargetingSprite):
 
         # Ships should be able to shoot the moment they're created
         self.reload_time = reload_time + 10
+
+        self.laser_sound = laser_sound
 
     def on_update(self, delta_time: float = 1 / 60):
         # Moves sprite towards target point at speed, returns angle to target
@@ -535,7 +566,8 @@ class EnemyShip(TargetingSprite):
                                          self.laser_scale,
                                          angle=self.angle + 180,
                                          speed=self.laser_speed,
-                                         fade_rate=self.laser_fade_rate))
+                                         fade_rate=self.laser_fade_rate,
+                                         sound=self.laser_sound))
             # TODO: fix this...
             self.reload_time = self.laser_speed
 
@@ -545,7 +577,7 @@ class Explosion(arcade.Sprite):
     Creates a sprite and animates it once in place with textures, then
     disappears.
     """
-    def __init__(self, textures, center_x, center_y, scale=1):
+    def __init__(self, textures, center_x, center_y, scale=1, sound=None):
 
         # Initialize from super without images
         super().__init__(center_x=center_x, center_y=center_y, scale=scale)
@@ -555,6 +587,12 @@ class Explosion(arcade.Sprite):
         # Initialize current texture and texture index
         self.cur_texture_index = 0
         self.texture = self.textures[self.cur_texture_index]
+
+        # Optionally play sound (if one is sent)
+        self.sound = sound
+        self.player = None
+        if self.sound:
+            self.player = sound.play()
 
     def update(self):
         """
@@ -581,14 +619,19 @@ class MyGameWindow(arcade.Window):
     # TODO: Install Python 3.10 after semester; allows for writing
     #  Union[int, float] as int | float
     def __init__(self, width: int, height: int, title: str,
-                 explosion_textures: Tuple[List[arcade.Texture], Union[int,
-                                                                       float]],
-                 player_ship_files: Tuple[Tuple[str, str, str],
-                                          Union[int, float]],
-                 player_laser_file: Tuple[str, Union[int, float]],
-                 enemy_ship_files: Tuple[Tuple[str, str], Union[int, float]],
-                 enemy_laser_file: Tuple[str, Union[int, float]],
-                 asteroid_files: Tuple[List[str], Union[int, float]]):
+                 explosion_textures: Tuple[List[arcade.Texture],
+                                           Union[int, float]],
+                 player_ship_image_files: Tuple[Tuple[str, str, str],
+                                                Union[int, float]],
+                 player_laser_image_file: Tuple[str, Union[int, float]],
+                 enemy_ship_image_files: Tuple[Tuple[str, str],
+                                               Union[int, float]],
+                 enemy_laser_image_file: Tuple[str, Union[int, float]],
+                 asteroid_image_files: Tuple[List[str], Union[int, float]],
+                 background_music: str, player_laser_sound: str,
+                 enemy_laser_sound: str, explosion_sound: str,
+                 level_up_sound: str, lost_life_sound: str,
+                 win_sound: str, game_over_sound: str):
         """
         Constructor.
         Initializes attributes to None so they're recognized, but calls
@@ -604,13 +647,16 @@ class MyGameWindow(arcade.Window):
         arcade.set_background_color((0, 0, 0))
 
         # Used for indexing, so start at zero
-        self.level = 1
+        self.level = 0
 
         # Start with 0 points
         self.points = 0
 
-        # Lives TODO: IDK if this should go here or in player
+        # Lives
         self.lives = 3
+
+        # Whether the player has won
+        self.won = False
 
         # Exception will be thrown if there's an attempt to update this
         # before setup() is called. That is intentional
@@ -622,20 +668,57 @@ class MyGameWindow(arcade.Window):
         self.explosion_image_scale = explosion_textures[1]
 
         # Filenames and scale for sprite images
-        self.player_ship_filenames = player_ship_files[0]
-        self.player_ship_image_scale = player_ship_files[1]
+        self.player_ship_filenames = player_ship_image_files[0]
+        self.player_ship_image_scale = player_ship_image_files[1]
 
-        self.player_laser_filename = player_laser_file[0]
-        self.player_laser_image_scale = player_laser_file[1]
+        self.player_laser_filename = player_laser_image_file[0]
+        self.player_laser_image_scale = player_laser_image_file[1]
 
-        self.enemy_ship_filenames = enemy_ship_files[0]
-        self.enemy_ship_image_scale = enemy_ship_files[1]
+        self.enemy_ship_filenames = enemy_ship_image_files[0]
+        self.enemy_ship_image_scale = enemy_ship_image_files[1]
 
-        self.enemy_laser_filename = enemy_laser_file[0]
-        self.enemy_laser_image_scale = enemy_laser_file[1]
+        self.enemy_laser_filename = enemy_laser_image_file[0]
+        self.enemy_laser_image_scale = enemy_laser_image_file[1]
 
-        self.asteroid_filenames = asteroid_files[0]
-        self.asteroid_image_scale = asteroid_files[1]
+        self.asteroid_filenames = asteroid_image_files[0]
+        self.asteroid_image_scale = asteroid_image_files[1]
+
+        # Load sounds
+        self.background_music_sound = arcade.load_sound(background_music)
+        self.background_music_player = None    # Necessary to stop playing
+
+        self.player_laser_sound = arcade.load_sound(player_laser_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.player_laser_player = None
+
+        self.enemy_laser_sound = arcade.load_sound(enemy_laser_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.enemy_laser_player = None
+
+        # TODO: maybe stop playing this (if setup() is called,
+        #  game ends or player wins)
+        self.explosion_sound = arcade.load_sound(explosion_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.explosion_player = None
+
+        # TODO: maybe stop playing this (if lose life is called)
+        self.level_up_sound = arcade.load_sound(level_up_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.level_up_player = None
+
+        self.lost_life_sound = arcade.load_sound(lost_life_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.lost_life_player = None
+
+        self.win_sound = arcade.load_sound(win_sound)
+        # TODO: is this needed?
+        self.win_player = None
+
+        # TODO: maybe stop playing this (if setup() is called)
+        self.game_over_sound = arcade.load_sound(game_over_sound)
+        # Not needed; don't do check if sound is playing or stop it
+        self.game_over_player = None
+
 
         # Key press info
         self.left_pressed = False
@@ -651,7 +734,7 @@ class MyGameWindow(arcade.Window):
         # Game level settings store specific settings (which ship image to
         # use, how many asteroids or enemies to have, etc.)
         # These can be easily changed to alter level feel or difficulty
-        self.level_settings = {'points goal': (200, 400, 600),
+        self.level_settings = {'points goal': (100, 200, 300),
                                'player ship': self.player_ship_filenames,
                                'player laser fade': (15, 15, 15),
                                # TODO: Not working -- one getting in
@@ -661,14 +744,17 @@ class MyGameWindow(arcade.Window):
                                'starting enemies': (0, 10, 5),
                                'enemy spawn rate': (0, .5, .5),  # per second
                                'enemy speed range': ((50, 100), (30, 80),
-                                                     (100, 150)),
-                               # TODO: change to distance-based
+                                                     (80, 130)),
+                               # TODO: change to distance-based -- right now there's something with max()
                                'enemy laser fade': (255, 40, 40),  # per frames
                                'enemy laser reload': (10, 10, 10),
                                'starting asteroids': (10, 0, 10),
                                'asteroid spawn rate': (1, 0, 1),
                                'asteroid speed range': ((50, 200), (50, 200),
-                                                        (100, 250))}
+                                                        (100, 200))}
+
+        self.asteroids_spawning = None
+        self.enemies_spawning = None
 
         # These are set up later in setup() because they're reset at each
         # death or new level
@@ -697,11 +783,35 @@ class MyGameWindow(arcade.Window):
         :return: None
         """
 
+        # Number of updates since level started
+        self.updates_this_level = 0
+
+        # Start background sound. stop any previously playing background sound
+        if (self.background_music_player
+                and self.background_music_sound.is_playing(
+                    self.background_music_player)):
+            self.background_music_sound.stop(self.background_music_player)
+
+        self.background_music_player = self.background_music_sound.play(
+            loop=True)
+
+        # TODO: for debugging
+        # if self.level > 0:
+        #     self.background_music_sound.stop(self.background_music_player)
+
+
         # TODO: keep or remove?
         level = self.level
 
-        # Number of updates since level started
-        self.updates_this_level = 0
+        # Set number of updates before new asteroid or enemy is spawned
+        # 60 updates per second TODO: change to self.update_rate as parameter
+        # TODO better way to handle whether asteroids etc in level
+        if self.level_settings['starting asteroids'][level] > 0:
+            self.asteroids_spawning = 60 // self.level_settings[
+                'asteroid spawn rate'][level]
+        if self.level_settings['starting enemies'][level] > 0:
+            self.enemies_spawning = 60 // self.level_settings[
+                'enemy spawn rate'][level]
 
         # Set up laser lists first because they need to be passed to player
         # and enemy sprites
@@ -725,7 +835,8 @@ class MyGameWindow(arcade.Window):
                                     self.player_laser_list,
                                     (self.width, self.height),
                                     laser_fade_rate=self.level_settings[
-                                        'player laser fade'][level])
+                                        'player laser fade'][level],
+                                    laser_sound=self.player_laser_sound)
 
         self.player_sprite.center_x = self.width // 2
         self.player_sprite.center_y = self.height // 2
@@ -781,7 +892,8 @@ class MyGameWindow(arcade.Window):
                               laser_fade_rate=self.level_settings[
                                   'enemy laser fade'][self.level],
                               reload_time=self.level_settings[
-                                  'enemy laser reload'][self.level])
+                                  'enemy laser reload'][self.level],
+                              laser_sound=self.enemy_laser_sound)
 
             # TODO: Give enemy lasers slower fade rate for higher level
 
@@ -818,11 +930,14 @@ class MyGameWindow(arcade.Window):
         # Draw explosions in front of all other sprites
         self.explosion_list.draw()
 
+        # TODO: draw multi-line text?
         # Draw writing last so it can be seen in front of everything
         arcade.draw_text("Points: {}".format(self.points), 20,
                          self.height - 30, font_size=14, bold=True)
         arcade.draw_text("Level: {}".format(self.level + 1), 20,
                          self.height - 60, font_size=14, bold=True)
+        arcade.draw_text("Extra Lives: {}".format(self.lives), 20,
+                         self.height - 90, font_size=14, bold=True)
 
     def on_update(self, delta_time):
         """
@@ -831,15 +946,25 @@ class MyGameWindow(arcade.Window):
         :return:
         """
 
+        # Level check
+
         # If points goal reached for this level, jump to the next one
         if self.points >= self.level_settings['points goal'][self.level]:
-            self.level += 1
-            if self.level <= 2:
+            if self.level <= 1:
+                self.level += 1
+                self.level_up_sound.play()
                 self.setup()
-
+            else:
+                # TODO: ending screen and STOP ALL ELSE FOR WINNING maybe
+                self.background_music_sound.stop(self.background_music_player)
+                if not self.won:
+                    self.win_sound.play()  # TODO figure this out -- seems to avoid pyglet error
+                    self.won = True
 
         # Count updates since level started
         self.updates_this_level += 1
+
+        # Check collisions
 
         # Check collisions first because we'll delete sprites based on these
         # collisions and want them to have visually overlapped in the last
@@ -863,16 +988,44 @@ class MyGameWindow(arcade.Window):
             hits += h
 
         if hits:
+            # TODO: pause before restarting... self.dead = False, if self.dead
+            #  or if self.dead > 0: self.dead -= 1, return...gives time for
+            #  explosion and sound to play before restart (60 ticks?)
             # Decrement lives left
             self.lives -= 1
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  self.player_sprite.center_x,
                                                  self.player_sprite.center_y,
-                                                 self.explosion_image_scale))
+                                                 self.explosion_image_scale,
+                                                 self.explosion_sound))
 
             # TODO: call setup and return early
 
             self.player_sprite.remove_from_sprite_lists()
+
+            # If lives left, restart level
+            if self.lives >= 0:
+                self.lost_life_sound.play()
+
+                # Don't reset points -- or I can't pass level 2
+                # Reset points to minimum to enter this level
+                # if self.level >= 1:
+                #     this = self.level_settings['points goal'][self.level]
+                #     last = self.level_settings['points goal'][self.level - 1]
+                #     self.points = this - last
+                # else:
+                #     self.points = 0
+
+                self.setup()
+
+            # If out of lives, restart game TODO: ending screen
+            else:
+                self.game_over_sound.play()
+                self.points = 0
+                self.lives = 2    # TODO: make more generic in case dif lives?
+                self.level = 0
+                self.setup()
+
             # TODO: Restart level?
             for hit in hits:
                 hit.remove_from_sprite_lists()
@@ -923,14 +1076,18 @@ class MyGameWindow(arcade.Window):
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  asteroid.center_x,
                                                  asteroid.center_y,
-                                                 self.explosion_image_scale))
+                                                 self.explosion_image_scale,
+                                                 self.explosion_sound))
             asteroid.remove_from_sprite_lists()
         for enemy in enemies_hit:
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  enemy.center_x,
                                                  enemy.center_y,
-                                                 self.explosion_image_scale))
+                                                 self.explosion_image_scale,
+                                                 self.explosion_sound))
             enemy.remove_from_sprite_lists()
+
+        # Player-dictated movement
 
         # Update player change_movement based on key presses
         # Default to no movement if keys aren't pressed
@@ -953,6 +1110,26 @@ class MyGameWindow(arcade.Window):
         # is pressed
         self.player_sprite.shooting = self.space_pressed
 
+        # TODO: make better
+        # If there are asteroids or enemies on level, add new ones on interval
+        if self.level_settings['starting asteroids'][self.level] > 0:
+            if self.asteroids_spawning > 0:
+                self.asteroids_spawning -= 1
+            else:
+                self.make_asteroids(1, self.level_settings[
+                    'asteroid speed range'][self.level])
+                self.asteroids_spawning = 60 // self.level_settings[
+                    'asteroid spawn rate'][self.level]
+        if self.level_settings['starting enemies'][self.level] > 0:
+            if self.enemies_spawning > 0:
+                self.enemies_spawning -= 1
+            else:
+                self.make_enemy_ships(1, self.level_settings[
+                    'enemy speed range'][self.level])
+                self.enemies_spawning = 60 // self.level_settings[
+                    'enemy spawn rate'][self.level]
+
+        # Non-player sprite movement
 
         # TODO: Undo this -- it's okay for them to stand still
         # Set enemies' new target point as player's current (soon-to-be-old)
@@ -967,12 +1144,13 @@ class MyGameWindow(arcade.Window):
             for enemy in self.enemy_list:
                 enemy.set_target(enemy.center_x, enemy.center_y)
 
+        # Update all sprite lists
+
         self.player_list.on_update(delta_time)
         self.player_laser_list.on_update(delta_time)
         self.asteroid_list.on_update(delta_time)
         self.enemy_list.on_update(delta_time)
         self.enemy_laser_list.on_update(delta_time)
-
         self.explosion_list.update()
 
     def on_key_press(self, symbol, modifiers):
@@ -999,17 +1177,24 @@ class MyGameWindow(arcade.Window):
         if symbol == arcade.key.SPACE:
             self.space_pressed = True
 
-        # For "cheating," jumping to a different level
+        # For "cheating," jumping to a different level with full lives and
+        # necessary points
         if symbol == arcade.key.KEY_1 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 0
+            self.lives = 2    # TODO: make more generic in case dif lives?
+            self.points = 0
             self.setup()
 
         if symbol == arcade.key.KEY_2 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 1
+            self.lives = 2    # TODO: make more generic in case dif lives?
+            self.points = self.level_settings['points goal'][0]
             self.setup()
 
         if symbol == arcade.key.KEY_3 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 2
+            self.lives = 2    # TODO: make more generic in case dif lives?
+            self.points = self.level_settings['points goal'][1]
             self.setup()
 
         # # TODO: DELETE -- JUST USED FOR DEBUGGING
@@ -1043,7 +1228,8 @@ class MyGameWindow(arcade.Window):
 
 def textures_from_spritesheet(filename: str, texture_width: int,
                               texture_height: int, columns: int,
-                              num_textures: int) -> List[arcade.Texture]:
+                              num_textures: int,
+                              skip_rate: int = 1) -> List[arcade.Texture]:
     """
     Returns a list of textures from given spritesheet. A spritesheet is an
     image file with grid of sprite textures. The textures must all be the
@@ -1082,7 +1268,7 @@ def textures_from_spritesheet(filename: str, texture_width: int,
     textures = []
 
     # Iterate over spritesheet
-    for i in range(num_textures):
+    for i in range(0, num_textures, skip_rate):
 
         # coordinates of top-left pixel of section to extract
         # x coordinate changes with every image, cycling over each column
@@ -1120,7 +1306,8 @@ def main():
                                                        "texture_height"],
                                                    EXPLOSION_FILE["columns"],
                                                    EXPLOSION_FILE[
-                                                       "num_textures"])
+                                                       "num_textures"],
+                                                   EXPLOSION_SKIP_RATE)
 
     # Set up list of 10 asteroid filenames formed from base name
     asteroid_filenames = []
@@ -1148,7 +1335,10 @@ def main():
 
     game = MyGameWindow(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE,
                         explosion_data, player_ship_data, player_laser_data,
-                        enemy_ship_data, enemy_laser_data, asteroid_data)
+                        enemy_ship_data, enemy_laser_data, asteroid_data,
+                        BACKGROUND_SOUND, PLAYER_LASER_SOUND,
+                        ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
+                        LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
 
     game.setup()
     arcade.run()
