@@ -775,6 +775,15 @@ class TitleView(FadingView):
                          font_size=80, align="center", bold=True,
                          width=self.window.width, multiline=True)
 
+    def on_key_press(self, symbol: int, modifiers: int):
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            self.window.show_view(self.game_view)
+
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
+
 
 class InstructionsView(FadingView):
     def __init__(self, game_view):
@@ -829,6 +838,14 @@ class InstructionsView(FadingView):
         if symbol == arcade.key.SPACE:
             self.window.show_view(self.game_view)
 
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            self.window.show_view(self.game_view)
+
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
+
 
 # Main game logic
 class GameView(arcade.View):
@@ -879,7 +896,7 @@ class GameView(arcade.View):
         self.points = 0
 
         # Lives
-        self.lives = 3
+        self.lives = 2
 
         # Whether the player has won
         self.won = False
@@ -1235,10 +1252,10 @@ class GameView(arcade.View):
                 self.level_up_sound.play()
                 self.setup()
             else:
-                # TODO: ending screen and STOP ALL ELSE FOR WINNING maybe
+                # TODO THIS WILL BREAK IF NO SOUND
                 self.background_music_sound.stop(self.background_music_player)
                 if not self.won:
-                    self.win_sound.play()  # TODO figure this out -- seems to avoid pyglet error
+                    self.win_sound.play()
                     self.won = True
                     won_view = GameWonView()
                     self.window.show_view(won_view)
@@ -1288,6 +1305,8 @@ class GameView(arcade.View):
 
             # If out of lives go to ending screen
             else:
+                # THIS WILL BREAK IF NO SOUND
+                self.background_music_sound.stop(self.background_music_player)
                 self.game_over_sound.play()
                 game_lost_view = GameLostView()
                 self.window.show_view(game_lost_view)
@@ -1431,8 +1450,8 @@ class GameView(arcade.View):
         # Pause game
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-            game = GameView()
-            self.window.show_view(game)
+            pause = PauseView(self)
+            self.window.show_view(pause)
 
         if symbol == arcade.key.RIGHT:
             self.right_pressed = True
@@ -1541,9 +1560,12 @@ class GameLostView(arcade.View):
         # Restart program, TODO also reset to level 1
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
-            game = GameView()
+            game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
+
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
 
 
 class GameWonView(arcade.View):
@@ -1597,9 +1619,12 @@ class GameWonView(arcade.View):
         # Restart program, TODO also reset to level 1
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
-            game = GameView()
+            game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
+
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
 
 
 class PauseView(arcade.View):
@@ -1607,6 +1632,16 @@ class PauseView(arcade.View):
         super().__init__()
 
         self.game_view = game_view
+        self.sound_time = 0
+
+        # If music, get it's current position and stop it
+        if (self.game_view.background_music_sound
+                and self.game_view.background_music_player):
+            if self.game_view.background_music_sound.is_playing(
+                    self.game_view.background_music_player):
+                self.sound_time = self.game_view.background_music_player.time
+                self.game_view.background_music_sound.stop(
+                    self.game_view.background_music_player)
 
         arcade.set_background_color((0, 0, 0))
         self.faded_look = (255, 255, 255, 100)
@@ -1665,14 +1700,20 @@ class PauseView(arcade.View):
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
 
-# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
-            game = GameView()
+            game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
 
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-            pause_view = PauseView(self.game_view)
-            self.window.show_view(pause_view)
+            # If music, restart it
+            if (self.game_view.background_music_sound
+                    and self.game_view.background_music_player):
+                self.game_view.background_music_player = \
+                    self.game_view.background_music_sound.play()
+                # Learned from looking at arcade examples (Pyglet code)
+                self.game_view.background_music_player.seek(self.sound_time)
+
+            self.window.show_view(self.game_view)
 
 
 def textures_from_spritesheet(filename: str, texture_width: int,
@@ -1737,7 +1778,6 @@ def textures_from_spritesheet(filename: str, texture_width: int,
 
     return textures
 
-
 def main():
     """
     Determines the specifics of screen size and which images to use for each
@@ -1782,13 +1822,24 @@ def main():
     # so it's a tuple of Textures and scale
     explosion_data = (explosion_textures, EXPLOSION_SCALE)
 
+    # Create a window object to hold the views
+    # All view objects can access it as one of their attributes without
+    # being explicitly passed it as a parameter
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    game_view = GameView(explosion_data, player_ship_data, player_laser_data,
+
+    game_parameters = (explosion_data, player_ship_data, player_laser_data,
                          enemy_ship_data, enemy_laser_data, asteroid_data,
                          BACKGROUND_SOUND, PLAYER_LASER_SOUND,
                          ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
                          LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
+
+    # The asterisk unpacks the tuple so it's like I'm passing it 14 arguments
+    game_view = GameView(*game_parameters)
     game_view.setup()
+    # TODO IS THIS OKAY PRATICE OR DO I NEED TO PASS IT AS A PARAM FROM ONE TO THE NEXT?
+    # Store game_parameters as Window attribute so all view objects can access
+    window.game_parameters = game_parameters
+    # Start with title view, which calls the next view, which calls the next...
     title_view = TitleView(game_view)
     window.show_view(title_view)
     arcade.run()
