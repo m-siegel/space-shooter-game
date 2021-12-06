@@ -85,7 +85,6 @@ SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 800
 SCREEN_TITLE = "Space Shooter"
 
-
 ASTEROID_POINTS = 5
 ENEMY_POINTS = 15
 
@@ -228,6 +227,7 @@ class Player(arcade.Sprite):
 
         self.laser_sound = laser_sound
 
+    # TODO: HOW MUCH SHOULD I DECOMPOSE?
     def on_update(self, delta_time: float = 1 / 60) -> None:
         """
         Updates sprite's position by changing angle, center_x and center_y to
@@ -241,6 +241,51 @@ class Player(arcade.Sprite):
         :return: None
         """
 
+        # TODO: NOW TURN AND MOVE
+        self.turn_and_move(delta_time)
+
+        # # Update angle player is facing
+        # # Multiply by delta_time for smooth movement
+        # self.angle += self.change_angle * delta_time
+        #
+        # # Find change_x and change_y based on new angle (essentially a target
+        # # point). Default angle is North, so target point on unit circle
+        # # x-coordinate (change_x) is negative sin (not positive cos) and
+        # # y-coordinate (change_y) is cos (not sin)
+        # self.change_x = -math.sin(math.radians(self.angle))
+        # self.change_y = math.cos(math.radians(self.angle))
+        #
+        # # Move sprite in direction it's facing, as determined above
+        # self.center_x += self.change_x * self.speed * delta_time
+        # self.center_y += self.change_y * self.speed * delta_time
+        #
+        # # Let sprite go offscreen so player feels like they can get lost,
+        # # but keep sprite from going far so player can bring it back onto
+        # # screen immediately
+        # if self.center_x < -1 * self.diagonal_size / 2:
+        #     self.center_x = -1 * self.diagonal_size / 2
+        # if self.center_x > self.window_width + self.diagonal_size / 2:
+        #     self.center_x = self.window_width + self.diagonal_size / 2
+        # if self.center_y < -1 * self.diagonal_size / 2:
+        #     self.center_y = -1 * self.diagonal_size / 2
+        # if self.center_y > self.window_height + self.diagonal_size / 2:
+        #     self.center_y = self.window_height + self.diagonal_size / 2
+
+        # TODO: NOW, SHOOT LASERS
+        self.shoot_lasers()
+        # # Shoot lasers
+        # if self.shooting and self.reload_ticks <= 0:
+        #     self.laser_list.append(Laser(self.center_x, self.center_y,
+        #                                  self.laser_filename, self.laser_scale,
+        #                                  angle=self.angle,
+        #                                  speed=400,    # TODO: variable
+        #                                  fade_rate=self.laser_fade_rate,
+        #                                  sound=self.laser_sound))
+        #     self.reload_ticks = self.reload_time
+        # else:
+        #     self.reload_ticks -= 1
+
+    def turn_and_move(self, delta_time: float = 1 / 60) -> None:
         # Update angle player is facing
         # Multiply by delta_time for smooth movement
         self.angle += self.change_angle * delta_time
@@ -268,12 +313,13 @@ class Player(arcade.Sprite):
         if self.center_y > self.window_height + self.diagonal_size / 2:
             self.center_y = self.window_height + self.diagonal_size / 2
 
+    def shoot_lasers(self):
         # Shoot lasers
         if self.shooting and self.reload_ticks <= 0:
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          self.laser_filename, self.laser_scale,
                                          angle=self.angle,
-                                         speed=400,    # TODO: variable
+                                         speed=400,  # TODO: variable
                                          fade_rate=self.laser_fade_rate,
                                          sound=self.laser_sound))
             self.reload_ticks = self.reload_time
@@ -377,7 +423,7 @@ class TargetingSprite(arcade.Sprite):
         x_distance = self.target_x - self.center_x
         y_distance = self.target_y - self.center_y
 
-        # No need to move if already at target point
+        # Only move if not already at target point
         if x_distance != 0 or y_distance != 0:
 
             # Angle between -pi and pi, formed by pos x axis and vector to
@@ -657,7 +703,135 @@ class Explosion(arcade.Sprite):
                                                   len(self.textures)))
 
 
-class MyGameWindow(arcade.Window):
+class FadingView(arcade.View):
+    def __init__(self, fade_rate: int, alpha: int):
+        super().__init__()
+
+        self.alpha = alpha
+        self.fade_rate = fade_rate
+
+    def fade_in(self):
+        self.alpha += self.fade_rate
+        if self.alpha >= 255:
+            self.alpha = 255
+            return True
+        else:
+            return False
+
+    def fade_out(self):
+        self.alpha -= self.fade_rate
+        if self.alpha <= 0:
+            self.alpha = 0
+            return True
+        else:
+            return False
+
+
+class TitleView(FadingView):
+    def __init__(self, game_view):
+        super().__init__(5, 0)
+
+        arcade.set_background_color((0, 0, 0))
+
+        self.game_view = game_view
+
+        self.title_text = "Spin\n&\nShoot"
+
+        self.faded_in = False
+        self.pause_count = 60
+        self.faded_out = False
+
+        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.bg_points = ((0, 0), (self.window.width, 0),
+                          (self.window.width, self.window.height),
+                          (0, self.window.height))
+
+    def on_update(self, delta_time: float = 1 / 60):
+        if self.faded_out:
+            instructions = InstructionsView(self.game_view)
+            self.window.show_view(instructions)
+        if not self.faded_in:
+            self.faded_in = self.fade_in()
+        elif self.pause_count == 0:
+            self.faded_out = self.fade_out()
+        else:
+            self.pause_count -= 1
+
+    def on_draw(self):
+        arcade.start_render()
+
+        green = (27, 160, 62, self.alpha)
+        black = (0, 0, 0, self.alpha)
+        blue = (0, 0, 205, self.alpha)
+        self.bg_colors = (black, blue, black, green)
+        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
+                                                                self.bg_colors)
+
+        background.draw()
+
+        arcade.draw_text(self.title_text, self.window.width / 2,
+                         self.window.height / 2, (255, 255, 255, self.alpha),
+                         anchor_x="center", anchor_y="center",
+                         font_size=80, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+
+class InstructionsView(FadingView):
+    def __init__(self, game_view):
+        super().__init__(5, 0)
+
+        arcade.set_background_color((0, 0, 0))
+
+        self.game_view = game_view
+
+        self.title_text = ("INSTRUCTIONS:"
+                           "\n\n\nShoot the asteroids and enemies without"
+                           " getting shot"
+                           "\n\n\nMove forward and backward with up and down "
+                           "arrows"
+                           "\n\nSpin left and right with left and right arrows"
+                           "\n\nShoot with the space bar"
+                           "\n\n\nPause with 'cmd + t' or 'ctrl + t'"
+                           "\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                           "\n\nExit with 'cmd + w' or 'ctrl + w'"
+                           "\n\n\nPress space to start")
+
+        self.faded_in = False
+
+        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.bg_points = ((0, 0), (self.window.width, 0),
+                          (self.window.width, self.window.height),
+                          (0, self.window.height))
+
+    def on_update(self, delta_time: float = 1 / 60):
+        if not self.faded_in:
+            self.faded_in = self.fade_in()
+
+    def on_draw(self):
+        arcade.start_render()
+
+        purple = (65, 44, 129, self.alpha)
+        black = (0, 0, 0, self.alpha)
+        blue = (0, 0, 205, self.alpha)
+        self.bg_colors = (black, purple, black, blue)
+        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
+                                                                self.bg_colors)
+
+        background.draw()
+
+        arcade.draw_text(self.title_text, self.window.width / 2,
+                         self.window.height / 2, (255, 255, 255, self.alpha),
+                         anchor_x="center", anchor_y="center",
+                         font_size=20, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+    def on_key_press(self, symbol: int, modifiers: int):
+        if symbol == arcade.key.SPACE:
+            self.window.show_view(self.game_view)
+
+
+# Main game logic
+class GameView(arcade.View):
     """
     Extends arcade.Window with specifics for how this game runs. Inherits
     attributes and methods from arcade.Window that make a game possible.
@@ -667,8 +841,7 @@ class MyGameWindow(arcade.Window):
     """
     # TODO: Install Python 3.10 after semester; allows for writing
     #  Union[int, float] as int | float
-    def __init__(self, width: int, height: int, title: str,
-                 explosion_textures: Tuple[List[arcade.Texture],
+    def __init__(self, explosion_textures: Tuple[List[arcade.Texture],
                                            Union[int, float]],
                  player_ship_image_files: Tuple[Tuple[str, str, str],
                                                 Union[int, float]],
@@ -691,9 +864,13 @@ class MyGameWindow(arcade.Window):
         :param height:
         :param title:
         """
-        super().__init__(width, height, title)
+        super().__init__()
 
         arcade.set_background_color((0, 0, 0))
+
+        # Window dimensions
+        self.width = self.window.width
+        self.height = self.window.height
 
         # Used for indexing, so start at zero
         self.level = 0
@@ -833,6 +1010,8 @@ class MyGameWindow(arcade.Window):
         # Number of updates since level started
         self.updates_this_level = 0
 
+        # TODO: If playing any other sounds (esp game over or game won, stop)
+
         # Start background sound. stop any previously playing background sound
         if (self.background_music_player
                 and self.background_music_sound.is_playing(
@@ -873,7 +1052,6 @@ class MyGameWindow(arcade.Window):
 
         # Set up player sprite and append to list
         # Player ship depends upon level
-        # TODO: FIGURE OUT FADE RATE 15 OR 30
         # PyCharm is confused by this first element because it comes from
         # a dictionary whose first value is a tuple of ints and PyCharm thinks
         # all values from that dict are int tuples, but this is a string
@@ -911,7 +1089,6 @@ class MyGameWindow(arcade.Window):
                                           Tuple[int, int, int]]) -> None:
 
         # TODO speed range (0, 0) or any single int, just make that the speed
-
         for i in range(num_asteroids):
             asteroid = Asteroid(random.choice(self.asteroid_filenames),
                                 self.asteroid_image_scale)
@@ -933,7 +1110,6 @@ class MyGameWindow(arcade.Window):
                                             Tuple[int, int, int]]) -> None:
 
         # TODO speed range (0, 0) or any single int, just make that the speed
-
         for i in range(num_enemies):
             # Pass laser list to enemy so enemy can fill it
             # Use the first image for levels 1 and 2, then switch for level 3
@@ -985,7 +1161,6 @@ class MyGameWindow(arcade.Window):
         # Draw explosions in front of all other sprites
         self.explosion_list.draw()
 
-        # TODO: draw multi-line text?
         # Draw writing last so it can be seen in front of everything
         arcade.draw_text("Points: {}".format(self.points), 20,
                          self.height - 30, font_size=14, bold=True)
@@ -997,12 +1172,62 @@ class MyGameWindow(arcade.Window):
     def on_update(self, delta_time):    # Super's signature doesn't type hint
         """
         Main game logic
-        :param delta_time:
-        :return:
         """
 
-        # Level check
+        # TODO if not self.game_over and not self.game_won:
 
+        # Check whether or not the player should level up and whether or not
+        # they die before anything else because if either happens, everything
+        # else gets reset and there's no point in updating movement that will get
+        # reset
+
+        # Do first so if player gets enough points to win as they get killed, they
+        # still win
+        self.update_level_based_on_points()
+
+        # Check player collisions before player laser collisions so in the
+        # case of the player and a laser both hitting a asteroid, the player
+        # dies
+        self.update_lives_based_on_hits()
+
+        # Increment count of updates this level after level_up_if_points()
+        # that calls setup, which returns to it, which returns to on_update, which
+        # then continues, and we want to count this update
+        self.updates_this_level += 1
+
+        # Check collisions
+
+        # TODO: Less verbose: Check collisions before moving sprites so on_draw
+        #  (and the player seeing sprite positions) happens between sprites hitting
+        #  each other and getting deleted. Otherwise, sprites could be deleted
+        #  based on their new positions without those positions ever being drawn
+
+        # Check collisions before moving sprits because we'll delete sprites based
+        # on these collisions and want them to have visually overlapped in the
+        # last frame before deleting them. If we deleted them after the other
+        # updates, we'd delete based on collisions that hadn't yet been drawn.
+        # Additionally, there's no need to move a sprite during this update
+        # if we'll also delete it during this update.
+        self.update_points_based_on_strikes()
+
+        # player-dictated actions
+        self.update_player_sprite_based_on_input()
+
+        # Refill obstacles
+        self.refill_asteroids_and_enemies()
+
+        # Set targets for enemy sprites
+        self.set_targets_for_enemies()
+
+        # Update all sprite lists
+        self.player_list.on_update(delta_time)
+        self.player_laser_list.on_update(delta_time)
+        self.asteroid_list.on_update(delta_time)
+        self.enemy_list.on_update(delta_time)
+        self.enemy_laser_list.on_update(delta_time)
+        self.explosion_list.update()
+
+    def update_level_based_on_points(self) -> None:
         # If points goal reached for this level, jump to the next one
         if self.points >= self.level_settings['points goal'][self.level]:
             if self.level <= 1:
@@ -1015,22 +1240,10 @@ class MyGameWindow(arcade.Window):
                 if not self.won:
                     self.win_sound.play()  # TODO figure this out -- seems to avoid pyglet error
                     self.won = True
+                    won_view = GameWonView()
+                    self.window.show_view(won_view)
 
-        # Count updates since level started
-        self.updates_this_level += 1
-
-        # Check collisions
-
-        # Check collisions first because we'll delete sprites based on these
-        # collisions and want them to have visually overlapped in the last
-        # frame before deleting them. If we deleted them after the other
-        # updates, we'd delete based on collisions that hadn't yet been drawn.
-        # Additionally, there's no need to move a sprite during this update
-        # if we'll also delete it during this update.
-
-        # Check player collisions before player laser collisions so in the
-        # case of the player and a laser both hitting a asteroid, the player
-        # dies
+    def update_lives_based_on_hits(self):
         # If the player collides with any other sprite, they die
         # Use sprite list to check instead of self.player_sprite so that
         # collisions don't get checked if player dies and is removed from list
@@ -1073,18 +1286,17 @@ class MyGameWindow(arcade.Window):
 
                 self.setup()
 
-            # If out of lives, restart game TODO: ending screen
+            # If out of lives go to ending screen
             else:
                 self.game_over_sound.play()
-                self.points = 0
-                self.lives = 2    # TODO: make more generic in case dif lives?
-                self.level = 0
-                self.setup()
+                game_lost_view = GameLostView()
+                self.window.show_view(game_lost_view)
 
-            # TODO: Restart level?
+            # TODO: Restart level? THIS ISN'T NECESSARY SINCE CALLING SETUP
             for hit in hits:
                 hit.remove_from_sprite_lists()
 
+    def update_points_based_on_strikes(self):
         # Check player laser collisions
         # Lists to track hit asteroids and enemies separately for scoring
         asteroids_hit = []
@@ -1142,8 +1354,7 @@ class MyGameWindow(arcade.Window):
                                                  self.explosion_sound))
             enemy.remove_from_sprite_lists()
 
-        # Player-dictated movement
-
+    def update_player_sprite_based_on_input(self):
         # Update player change_movement based on key presses
         # Default to no movement if keys aren't pressed
         self.player_sprite.change_angle = 0
@@ -1165,28 +1376,30 @@ class MyGameWindow(arcade.Window):
         # is pressed
         self.player_sprite.shooting = self.space_pressed
 
-        # TODO: make better
+        # TODO: could this be more generic and reused for both?
+
+    def refill_asteroids_and_enemies(self):
         # If there are asteroids or enemies on level, add new ones on interval
         if self.level_settings['starting asteroids'][self.level] > 0:
             if self.asteroids_spawning > 0:
                 self.asteroids_spawning -= 1
             else:
-                self.make_asteroids(1, self.level_settings[    # PyCharm's confused
-                    'asteroid speed range'][self.level])
+                self.make_asteroids(1,
+                                    self.level_settings[  # PyCharm's confused
+                                        'asteroid speed range'][self.level])
                 self.asteroids_spawning = 60 // self.level_settings[
                     'asteroid spawn rate'][self.level]
         if self.level_settings['starting enemies'][self.level] > 0:
             if self.enemies_spawning > 0:
                 self.enemies_spawning -= 1
             else:
-                self.make_enemy_ships(1, self.level_settings[    # PyCharm's confused
-                    'enemy speed range'][self.level])
+                self.make_enemy_ships(1,
+                                      self.level_settings[  # PyCharm's confused
+                                          'enemy speed range'][self.level])
                 self.enemies_spawning = 60 // self.level_settings[
                     'enemy spawn rate'][self.level]
 
-        # Non-player sprite movement
-
-        # TODO: Undo this -- it's okay for them to stand still
+    def set_targets_for_enemies(self):
         # Set enemies' new target point as player's current (soon-to-be-old)
         # location
         if len(self.player_list) >= 1:
@@ -1194,19 +1407,12 @@ class MyGameWindow(arcade.Window):
                 enemy.set_target(self.player_sprite.center_x,
                                  self.player_sprite.center_y)
         # If player has been removed from list (been killed), set enemies'
-        # targets to their current points so they keep moving
-        else:
-            for enemy in self.enemy_list:
-                enemy.set_target(enemy.center_x, enemy.center_y)
-
-        # Update all sprite lists
-
-        self.player_list.on_update(delta_time)
-        self.player_laser_list.on_update(delta_time)
-        self.asteroid_list.on_update(delta_time)
-        self.enemy_list.on_update(delta_time)
-        self.enemy_laser_list.on_update(delta_time)
-        self.explosion_list.update()
+        # targets to random points offscreen
+        # else:
+        #     for enemy in self.enemy_list:
+        #         enemy.set_target(enemy.center_x, enemy.center_y)
+        # TODO: change sprite so if there's no target, they just keep going
+        #  and then here set angle 180 of current and remove target
 
     # TODO: Not sure about return vals....
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -1219,7 +1425,14 @@ class MyGameWindow(arcade.Window):
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
             self.points = 0
+            self.level = 0
             self.setup()
+
+        # Pause game
+        if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            game = GameView()
+            self.window.show_view(game)
 
         if symbol == arcade.key.RIGHT:
             self.right_pressed = True
@@ -1253,17 +1466,6 @@ class MyGameWindow(arcade.Window):
             self.points = self.level_settings['points goal'][1]
             self.setup()
 
-        # # TODO: DELETE -- JUST USED FOR DEBUGGING
-        # if symbol == arcade.key.P:
-        #     for asteroid in self.asteroid_list:
-        #         # print("{}, {}\n{}, {}\n{}\n".format(asteroid.center_x,
-        #         #                                     asteroid.center_y,
-        #         #                                     asteroid.target_x,
-        #         #                                     asteroid.target_y,
-        #         #                                     asteroid.speed))
-        #         print(asteroid)
-        #     print("-" * 50)
-
     def on_key_release(self, symbol: int, modifiers: int) -> None:
 
         if symbol == arcade.key.RIGHT:
@@ -1290,6 +1492,187 @@ class MyGameWindow(arcade.Window):
                                                len(self.player_laser_list),
                                                len(self.enemy_laser_list),
                                                len(self.explosion_list)))
+
+
+class GameLostView(arcade.View):
+    def __init__(self):
+        super().__init__()
+
+        arcade.set_background_color((0, 0, 0))
+
+        self.game_over_text = "Game Over"
+        self.instruction_text = ("\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
+
+        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.bg_points = ((0, 0), (self.window.width, 0),
+                          (self.window.width, self.window.height),
+                          (0, self.window.height))
+
+    def on_draw(self):
+        arcade.start_render()
+
+        red = (128, 0, 0)
+        black = (0, 0, 0)
+        blue = (0, 0, 205)
+        self.bg_colors = (black, red, black, blue)
+        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
+                                                                self.bg_colors)
+
+        background.draw()
+
+        arcade.draw_text(self.game_over_text, self.window.width / 2,
+                         self.window.height / 2, (255, 255, 255),
+                         anchor_x="center", anchor_y="bottom",
+                         font_size=60, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+        arcade.draw_text(self.instruction_text, self.window.width / 2,
+                         self.window.width / 4, (255, 255, 255),
+                         anchor_x="center", anchor_y="baseline",
+                         font_size=20, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
+        # Gracefully quit program
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
+
+        # Restart program, TODO also reset to level 1
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
+            game = GameView()
+            self.window.show_view(game)
+
+
+class GameWonView(arcade.View):
+    def __init__(self):
+        super().__init__()
+
+        arcade.set_background_color((0, 0, 0))
+
+        self.game_won_text = "You won!"
+        self.instruction_text = ("\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
+
+        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.bg_points = ((0, 0), (self.window.width, 0),
+                          (self.window.width, self.window.height),
+                          (0, self.window.height))
+
+    # TODO --- let player play around? have to get sprites, updates and controls
+    def on_update(self, delta_time: float = 1 / 60):
+        pass
+
+    def on_draw(self):
+        arcade.start_render()
+
+        red = (180, 100, 240)
+        black = (0, 0, 0)
+        blue = (0, 0, 205)
+        self.bg_colors = (black, blue, black, red)
+        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
+                                                                self.bg_colors)
+
+        background.draw()
+
+        arcade.draw_text(self.game_won_text, self.window.width / 2,
+                         self.window.height / 2, (255, 255, 255),
+                         anchor_x="center", anchor_y="bottom",
+                         font_size=60, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+        arcade.draw_text(self.instruction_text, self.window.width / 2,
+                         self.window.width / 4, (255, 255, 255),
+                         anchor_x="center", anchor_y="baseline",
+                         font_size=20, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
+        # Gracefully quit program
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
+
+        # Restart program, TODO also reset to level 1
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
+            game = GameView()
+            self.window.show_view(game)
+
+
+class PauseView(arcade.View):
+    def __init__(self, game_view: GameView):
+        super().__init__()
+
+        self.game_view = game_view
+
+        arcade.set_background_color((0, 0, 0))
+        self.faded_look = (255, 255, 255, 100)
+
+        self.pause_text = "Paused"
+        self.instruction_text = ("\n\nResume play with 'cmd + t' or 'ctrl + t'"
+                                 "\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
+
+        self.player_list = game_view.player_list
+        self.asteroid_list = game_view.asteroid_list
+        self.enemy_list = game_view.enemy_list
+        self.player_lasers = game_view.player_laser_list
+        self.enemy_lasers = game_view.enemy_laser_list
+
+    def on_update(self, delta_time: float = 1 / 60):
+        pass
+
+    def on_draw(self):
+        arcade.start_render()
+
+        if self.player_list:
+            self.player_list.draw()
+        if self.asteroid_list:
+            self.asteroid_list.draw()
+        if self.enemy_list:
+            self.enemy_list.draw()
+        if self.player_lasers:
+            self.player_lasers.draw()
+        if self.enemy_lasers:
+            self.enemy_lasers.draw()
+
+        arcade.draw_rectangle_filled(self.window.width / 2,
+                                     self.window.height / 2,
+                                     self.window.width, self.window.height,
+                                     self.faded_look)
+
+        arcade.draw_text(self.pause_text, self.window.width / 2,
+                         self.window.height / 2, (255, 255, 255),
+                         anchor_x="center", anchor_y="bottom",
+                         font_size=60, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+        arcade.draw_text(self.instruction_text, self.window.width / 2,
+                         self.window.width / 4, (255, 255, 255),
+                         anchor_x="center", anchor_y="baseline",
+                         font_size=20, align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
+        # Gracefully quit program
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            arcade.close_window()
+
+        # Restart program, TODO also reset to level 1
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+
+# TODO ARGUMENTS FOR ALL RESTARTS -- TUPLES? DICTS?
+            game = GameView()
+            self.window.show_view(game)
+
+        if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+            pause_view = PauseView(self.game_view)
+            self.window.show_view(pause_view)
 
 
 def textures_from_spritesheet(filename: str, texture_width: int,
@@ -1399,14 +1782,15 @@ def main():
     # so it's a tuple of Textures and scale
     explosion_data = (explosion_textures, EXPLOSION_SCALE)
 
-    game = MyGameWindow(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE,
-                        explosion_data, player_ship_data, player_laser_data,
-                        enemy_ship_data, enemy_laser_data, asteroid_data,
-                        BACKGROUND_SOUND, PLAYER_LASER_SOUND,
-                        ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
-                        LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
-
-    game.setup()
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    game_view = GameView(explosion_data, player_ship_data, player_laser_data,
+                         enemy_ship_data, enemy_laser_data, asteroid_data,
+                         BACKGROUND_SOUND, PLAYER_LASER_SOUND,
+                         ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
+                         LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
+    game_view.setup()
+    title_view = TitleView(game_view)
+    window.show_view(title_view)
     arcade.run()
 
 
