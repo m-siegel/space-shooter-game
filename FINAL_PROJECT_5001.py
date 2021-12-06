@@ -898,8 +898,11 @@ class GameView(arcade.View):
         # Lives
         self.lives = 2
 
-        # Whether the player has won
-        self.won = False
+        # Whether the player is leveling up or dying. Allows for slight delay
+        # in changing screen so last explosions can play out
+        self.leveling_up = False
+        self.dying = False
+        self.switch_delay = 0    # Number of updates to delay switch
 
         # Exception will be thrown if there's an attempt to update this
         # before setup() is called. That is intentional
@@ -1026,6 +1029,18 @@ class GameView(arcade.View):
 
         # Number of updates since level started
         self.updates_this_level = 0
+
+        # At new level or new live, reset
+        self.leveling_up = False
+        self.dying = False
+        self.switch_delay = 0
+
+        if self.lost_life_player and not self.lost_life_sound.is_playing(
+                self.lost_life_player):
+            self.lost_life_player = None
+        if self.level_up_player and not self.level_up_sound.is_playing(
+                self.level_up_player):
+            self.level_up_player = None
 
         # TODO: If playing any other sounds (esp game over or game won, stop)
 
@@ -1198,14 +1213,16 @@ class GameView(arcade.View):
         # else gets reset and there's no point in updating movement that will get
         # reset
 
-        # Do first so if player gets enough points to win as they get killed, they
-        # still win
-        self.update_level_based_on_points()
+        # Do first so if player gets enough points to win as they get killed,
+        # they still win. If they're already dying, they don't get to level up
+        if not self.dying:
+            self.update_level_based_on_points()
 
         # Check player collisions before player laser collisions so in the
         # case of the player and a laser both hitting a asteroid, the player
-        # dies
-        self.update_lives_based_on_hits()
+        # dies. Can't die while leveling up
+        if not self.leveling_up:
+            self.update_lives_based_on_hits()
 
         # Increment count of updates this level after level_up_if_points()
         # that calls setup, which returns to it, which returns to on_update, which
@@ -1248,72 +1265,113 @@ class GameView(arcade.View):
         # If points goal reached for this level, jump to the next one
         if self.points >= self.level_settings['points goal'][self.level]:
             if self.level <= 1:
-                self.level += 1
-                self.level_up_sound.play()
-                self.setup()
+                # If hasn't played sound and there is sound to play
+                if not self.level_up_player and self.level_up_sound:
+                    self.level_up_player = self.level_up_sound.play()
+                # TODO: Level up immediately or faster, but have flash to signal?
+                # Slightly delay switch to next level so last explosions can
+                # play out at this level
+                if self.leveling_up is True and self.switch_delay == 30:
+                    self.level += 1
+                    self.setup()
+                else:
+                    self.leveling_up = True
+                    self.switch_delay += 1
             else:
-                # TODO THIS WILL BREAK IF NO SOUND
-                self.background_music_sound.stop(self.background_music_player)
-                if not self.won:
-                    self.win_sound.play()
-                    self.won = True
-                    won_view = GameWonView()
+                # TODO DEFENSIVE CODING FOR ALL SOUNDS
+                # Since background_music_player is None unless sound has been
+                # played, if it is True, then background_music_player is True
+                if (self.background_music_player
+                        and self.background_music_sound.is_playing(
+                            self.background_music_player)):
+                    self.background_music_sound.stop(
+                        self.background_music_player)
+
+                # If hasn't played sound and there is sound to play
+                if not self.win_player and self.win_sound:
+                    self.win_player = self.win_sound.play()
+                # TODO: Level up immediately or faster, but have flash to signal?
+                # Slightly delay switch to next level so last explosions can
+                # play out at this level
+                if self.leveling_up is True and self.switch_delay == 30:
+                    won_view = GameWonView(self.win_player, self.win_sound)
                     self.window.show_view(won_view)
+                else:
+                    self.leveling_up = True
+                    self.switch_delay += 1
 
     def update_lives_based_on_hits(self):
         # If the player collides with any other sprite, they die
         # Use sprite list to check instead of self.player_sprite so that
         # collisions don't get checked if player dies and is removed from list
-        hits = []
-        for player in self.player_list:
-            h = arcade.check_for_collision_with_lists(player,
-                                                      [self.asteroid_list,
-                                                       self.enemy_laser_list,
-                                                       self.enemy_list])
-            hits += h
 
-        if hits:
-            # TODO: pause before restarting... self.dead = False, if self.dead
-            #  or if self.dead > 0: self.dead -= 1, return...gives time for
-            #  explosion and sound to play before restart (60 ticks?)
-            # Decrement lives left
-            self.lives -= 1
-            self.explosion_list.append(Explosion(self.explosion_textures,
-                                                 self.player_sprite.center_x,
-                                                 self.player_sprite.center_y,
-                                                 self.explosion_image_scale,
-                                                 self.explosion_sound))
+        if not self.dying:
+            hits = []
+            for player in self.player_list:
+                h = arcade.check_for_collision_with_lists(player,
+                                                          [self.asteroid_list,
+                                                           self.enemy_laser_list,
+                                                           self.enemy_list])
+                hits += h
 
-            # TODO: call setup and return early
+            if hits:
+                # TODO: pause before restarting... self.dead = False, if self.dead
+                #  or if self.dead > 0: self.dead -= 1, return...gives time for
+                #  explosion and sound to play before restart (60 ticks?)
+                self.explosion_list.append(Explosion(self.explosion_textures,
+                                                     self.player_sprite.center_x,
+                                                     self.player_sprite.center_y,
+                                                     self.explosion_image_scale,
+                                                     self.explosion_sound))
 
-            self.player_sprite.remove_from_sprite_lists()
+                for hit in hits:
+                    hit.remove_from_sprite_lists()
 
+                self.player_sprite.remove_from_sprite_lists()
+
+                self.dying = True
+
+        if self.dying:
             # If lives left, restart level
-            if self.lives >= 0:
-                self.lost_life_sound.play()
+            if self.lives >= 1:
+                # If hasn't played sound
+                if not self.lost_life_player and self.lost_life_sound:
+                    self.lost_life_player = self.lost_life_sound.play()
 
-                # Don't reset points -- or I can't pass level 2
-                # Reset points to minimum to enter this level
-                # if self.level >= 1:
-                #     this = self.level_settings['points goal'][self.level]
-                #     last = self.level_settings['points goal'][self.level - 1]
-                #     self.points = this - last
-                # else:
-                #     self.points = 0
-
-                self.setup()
+                # Slightly delay reset of level so last explosions can
+                # play out
+                if self.switch_delay == 60:
+                    # Decrement lives left
+                    self.lives -= 1
+                    self.setup()
+                else:
+                    self.dying = True
+                    self.switch_delay += 1
 
             # If out of lives go to ending screen
             else:
-                # THIS WILL BREAK IF NO SOUND
-                self.background_music_sound.stop(self.background_music_player)
-                self.game_over_sound.play()
-                game_lost_view = GameLostView()
-                self.window.show_view(game_lost_view)
+                # Since background_music_player is None unless sound has been
+                # played, if it is True, then background_music_player is True
+                if (self.background_music_player
+                        and self.background_music_sound.is_playing(
+                            self.background_music_player)):
+                    self.background_music_sound.stop(
+                        self.background_music_player)
 
-            # TODO: Restart level? THIS ISN'T NECESSARY SINCE CALLING SETUP
-            for hit in hits:
-                hit.remove_from_sprite_lists()
+                # TODO: defensive coding for sound
+                # If hasn't played sound and there is a sound to play
+                if not self.game_over_player and self.game_over_sound:
+                    self.game_over_player = self.game_over_sound.play()
+
+                # Slightly delay switch to game over view so last explosions
+                # can play out at this level
+                if self.switch_delay == 60:
+                    # Go to game over screen
+                    game_lost_view = GameLostView()
+                    self.window.show_view(game_lost_view)
+                else:
+                    self.dying = True
+                    self.switch_delay += 1
 
     def update_points_based_on_strikes(self):
         # Check player laser collisions
@@ -1569,7 +1627,7 @@ class GameLostView(arcade.View):
 
 
 class GameWonView(arcade.View):
-    def __init__(self):
+    def __init__(self, player=None, sound=None):
         super().__init__()
 
         arcade.set_background_color((0, 0, 0))
@@ -1582,6 +1640,9 @@ class GameWonView(arcade.View):
         self.bg_points = ((0, 0), (self.window.width, 0),
                           (self.window.width, self.window.height),
                           (0, self.window.height))
+
+        self.sound_player = player
+        self.sound = sound
 
     # TODO --- let player play around? have to get sprites, updates and controls
     def on_update(self, delta_time: float = 1 / 60):
@@ -1619,12 +1680,10 @@ class GameWonView(arcade.View):
         # Restart program, TODO also reset to level 1
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
+            if self.sound_player and self.sound.is_playing(self.sound_player):
+                self.sound.stop(self.sound_player)
             game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
-
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
 
 
 class PauseView(arcade.View):
