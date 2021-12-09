@@ -1433,8 +1433,8 @@ class GameView(arcade.View):
         # Validate parameters
         if not isinstance(num_asteroids, int):
             raise TypeError("TypeError: num_asteroids must be an int")
-        if num_asteroids <= 0:
-            raise ValueError("ValueError: num_asteroids must be positive")
+        if num_asteroids < 0:
+            raise ValueError("ValueError: num_asteroids must be non-negative")
         if not isinstance(speed_range, (int, tuple)):
             raise TypeError("TypeError: speed_range must be an int or tuple")
         if isinstance(speed_range, tuple):
@@ -1468,8 +1468,8 @@ class GameView(arcade.View):
         # Validate parameters
         if not isinstance(num_enemies, int):
             raise TypeError("TypeError: num_enemies must be an int")
-        if num_enemies <= 0:
-            raise ValueError("ValueError: num_enemies must be positive")
+        if num_enemies < 0:
+            raise ValueError("ValueError: num_enemies must be non-negative")
         if not isinstance(speed_range, (int, tuple)):
             raise TypeError("TypeError: speed_range must be an int or tuple")
         if isinstance(speed_range, tuple):
@@ -1740,15 +1740,14 @@ class GameView(arcade.View):
         self.remove_and_explode(asteroids_hit)
         self.remove_and_explode(enemies_hit)
 
-    def remove_and_explode(self, sprite_list):
+    def remove_and_explode(self, sprite_list: List[arcade.Sprite]):
         """
         Removes all sprites from list, leaving explosions where they were.
         """
 
         # Validate parameters
-        if not isinstance(sprite_list, arcade.SpriteList):
-            raise TypeError("TypeError: sprite_list must be an "
-                            "arcade.SpriteList")
+        if not isinstance(sprite_list, list):
+            raise TypeError("TypeError: sprite_list must be a list")
 
         for sprite in sprite_list:
             self.explosion_list.append(Explosion(self.explosion_textures,
