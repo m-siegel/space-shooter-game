@@ -94,7 +94,7 @@ SCREEN_TITLE = "Space Shooter"
 # for its scale. Most are set equal to IMAGE_SCALE, but all can be changed
 IMAGE_SCALE = .5
 
-# Player ship filenames (3 strign filenames: one for each level)
+# Player ship filenames (3 string filenames: one for each level)
 PLAYER_SHIPS = ("media/kenney_nl/spaceshooter/PNG/"
                 "Player_ships/playerShip1_blue.png",
                 "media/kenney_nl/spaceshooter/PNG/"
@@ -182,7 +182,7 @@ class Player(arcade.Sprite):
                  laser_fade_rate: Union[int, float] = 15,
                  laser_sound: Optional[arcade.Sound] = None):
         """
-        Constructor. Sets attributes self.speed, self.angle_rate and 
+        Constructor. Sets attributes self.speed, self.angle_rate and
         self.forward_rate. Uses arcade.Sprite default settings for other
         attributes, including self.angle.
         """
@@ -221,6 +221,8 @@ class Player(arcade.Sprite):
             raise TypeError("TypeError: laser_fade_rate must be numeric")
         if laser_fade_rate < 0:
             laser_fade_rate = 0
+        if laser_fade_rate > 255:
+            laser_fade_rate = 255
         if laser_sound and not isinstance(laser_sound, arcade.Sound):
             raise TypeError("TypeError: laser_sound must be an arcade.Sound")
 
@@ -316,8 +318,10 @@ class Player(arcade.Sprite):
         # point). Default angle is North, so target point on unit circle
         # x-coordinate (change_x) is negative sin (not positive cos) and
         # y-coordinate (change_y) is cos (not sin)
-        self.change_x = -math.sin(math.radians(self.angle - self.image_rotation))
-        self.change_y = math.cos(math.radians(self.angle - self.image_rotation))
+        self.change_x = -math.sin(math.radians(
+            self.angle - self.image_rotation))
+        self.change_y = math.cos(math.radians(
+            self.angle - self.image_rotation))
 
         # Move sprite in direction it's facing, as determined above
         self.center_x += self.change_x * self.speed * delta_time
@@ -340,7 +344,8 @@ class Player(arcade.Sprite):
         if self.shooting and self.reload_ticks <= 0:
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          self.laser_filename, self.laser_scale,
-                                         angle=self.angle + self.laser_rotation,
+                                         angle=(self.angle
+                                                + self.laser_rotation),
                                          speed=self.laser_speed,
                                          fade_rate=self.laser_fade_rate,
                                          sound=self.laser_sound))
@@ -381,6 +386,8 @@ class Laser(arcade.Sprite):
             raise TypeError("TypeError: fade_rate must be a numeric type")
         if fade_rate < 0:
             fade_rate = 0
+        if fade_rate > 255:
+            fade_rate = 255
         if sound and not isinstance(sound, arcade.Sound):
             raise TypeError("TypeError: sound must be an arcade.Sound")
 
@@ -800,14 +807,45 @@ class Asteroid(TargetingSprite):
 
 class EnemyShip(TargetingSprite):
     def __init__(self, image_filename: str, scale: Union[int, float],
-                 image_rotation: int, laser_filename: str,
-                 laser_scale: Union[int, float], laser_rotation: int,
-                 laser_list: arcade.SpriteList,
-                 laser_speed: int = 0,
+                 image_rotation: Union[int, float], laser_filename: str,
+                 laser_scale: Union[int, float],
+                 laser_rotation: Union[int, float],
+                 laser_list: arcade.SpriteList, laser_speed: int = 0,
                  laser_fade_rate: Union[int, float] = 40,
                  laser_sound: Optional[arcade.Sound] = None):
 
-
+        # Validate parameters
+        if not isinstance(image_filename, str):
+            raise TypeError("TypeError: image_filename must be a string")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+        if not isinstance(image_rotation, (int, float)):
+            raise TypeError("TypeError: image_rotation must be a numeric type")
+        if not isinstance(laser_filename, str):
+            raise TypeError("TypeError: laser_filename must be a string")
+        if not isinstance(laser_scale, (int, float)):
+            raise TypeError("TypeError: laser_scale must be a numeric type")
+        if laser_scale <= 0:
+            raise ValueError("ValueError: laser_scale must be positive")
+        if not isinstance(laser_rotation, (int, float)):
+            raise TypeError("TypeError: laser_rotation must be a numeric type")
+        if not isinstance(laser_list, arcade.SpriteList):
+            raise TypeError("TypeError: laser_list must be an "
+                            "arcade.SpriteList")
+        if not isinstance(laser_speed, int):
+            raise TypeError("TypeError: laser_speed must be an int")
+        if not isinstance(laser_fade_rate, (int, float)):
+            raise TypeError("TypeError: laser_fade_rate must be numeric")
+        # TODO: ASK -- things like this are also checked in laser. is it okay
+        #  to check in both places? what's best practice?
+        if laser_fade_rate < 0:
+            laser_fade_rate = 0
+        if laser_fade_rate > 255:
+            laser_fade_rate = 255
+        if laser_sound and not isinstance(laser_sound, arcade.Sound):
+            raise TypeError("TypeError: laser_sound must be an arcade.Sound")
 
         super().__init__(image_filename, scale, file_rotation=image_rotation)
 
@@ -828,8 +866,16 @@ class EnemyShip(TargetingSprite):
         self.laser_sound = laser_sound
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # Moves sprite towards target point at speed, returns angle to target
-        # TODO: ASK -- Technically this argument isn't necessary, but it adds clarity
+        # TODO: ASK -- Technically this argument isn't necessary,
+        #  but it adds clarity
         angle_rad = super().on_update(delta_time)
 
         # Set angle of ship to match angle of movement
@@ -845,7 +891,8 @@ class EnemyShip(TargetingSprite):
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          self.laser_filename,
                                          self.laser_scale,
-                                         angle=self.angle + self.laser_rotation,
+                                         angle=(self.angle
+                                                + self.laser_rotation),
                                          speed=self.laser_speed,
                                          fade_rate=self.laser_fade_rate,
                                          sound=self.laser_sound))
@@ -870,6 +917,27 @@ class Explosion(arcade.Sprite):
                  scale: Union[int, float] = 1,
                  sound: Optional[arcade.Sound] = None):
 
+        # Validate parameters
+        if not isinstance(textures, list):
+            raise TypeError("TypeError: textures must be a list")
+        if len(textures) <= 0:
+            raise ValueError("ValueError: textures must have at least one "
+                             "texture")
+        for texture in textures:
+            if not isinstance(texture, arcade.Texture):
+                raise TypeError("TypeError: elements in textures must be "
+                                "arcade.Textures")
+        if not isinstance(center_x, (int, float)):
+            raise TypeError("TypeError: center_x must be a numeric type")
+        if not isinstance(center_y, (int, float)):
+            raise TypeError("TypeError: center_y must be a numeric type")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+        if sound and not isinstance(sound, arcade.Sound):
+            raise TypeError("TypeError: sound must be an arcade.Sound")
+
         # Initialize from super without images
         super().__init__(center_x=center_x, center_y=center_y, scale=scale)
 
@@ -885,6 +953,8 @@ class Explosion(arcade.Sprite):
         if self.sound:
             self.player = sound.play()
 
+    # TODO: ASK if a method only has itself as a parameter, do I need to
+    #  validate it?
     def update(self) -> None:
         """
         Animate explosion.
@@ -916,11 +986,15 @@ class GameView(arcade.View):
     def __init__(self, explosion_textures: Tuple[List[arcade.Texture],
                                                  Union[int, float]],
                  player_ship_image_files: Tuple[Tuple[str, str, str],
-                                                Union[int, float], int],
-                 player_laser_image_file: Tuple[str, Union[int, float], int],
+                                                Union[int, float],
+                                                Union[int, float]],
+                 player_laser_image_file: Tuple[str, Union[int, float],
+                                                Union[int, float]],
                  enemy_ship_image_files: Tuple[Tuple[str, str],
-                                               Union[int, float], int],
-                 enemy_laser_image_file: Tuple[str, Union[int, float], int],
+                                               Union[int, float],
+                                               Union[int, float]],
+                 enemy_laser_image_file: Tuple[str, Union[int, float],
+                                               Union[int, float]],
                  asteroid_image_files: Tuple[List[str], Union[int, float]],
                  background_music: str, player_laser_sound: str,
                  enemy_laser_sound: str, explosion_sound: str,
@@ -932,10 +1006,179 @@ class GameView(arcade.View):
         setup() to set their values so as not to repeat code that needs to
         exist in a setup method (to be able to reset at game restart).
         Sets background color, since that only needs to happen once.
-        :param width:
-        :param height:
-        :param title:
         """
+
+        # Validate parameters
+
+        # explosion_textures
+        if not isinstance(explosion_textures, tuple):
+            raise TypeError("TypeError: explosion_textures must be a tuple")
+        if len(explosion_textures) < 2:
+            raise ValueError("ValueError: explosion_textures needs at least "
+                             "two elements")
+        if not isinstance(explosion_textures[0], list):
+            raise TypeError("TypeError: explosion_textures[0] must be a list")
+        if len(explosion_textures[0]) <= 0:
+            raise ValueError("ValueError: explosion_textures[0] must have at "
+                             "least one texture")
+        for texture in explosion_textures[0]:
+            if not isinstance(texture, arcade.Texture):
+                raise TypeError("TypeError: elements in explosion_textures[0]"
+                                " must be arcade.Textures")
+        if not isinstance(explosion_textures[1], (int, float)):
+            raise TypeError("TypeError: explosion_textures[1] must be a "
+                            "numeric type")
+        if explosion_textures[1] <= 0:
+            raise ValueError("ValueError: explosion_textures[1] must be "
+                             "positive")
+
+        # player_ship_image_files
+        if not isinstance(player_ship_image_files, tuple):
+            raise TypeError("TypeError: player_ship_image_files must be a "
+                            "tuple")
+        if len(player_ship_image_files) != 3:
+            raise ValueError(
+                "ValueError: player_ship_image_files must have three elements")
+        if not isinstance(player_ship_image_files[0], tuple):
+            raise TypeError(
+                "TypeError: player_ship_image_files[0] must be a tuple")
+        if len(player_ship_image_files[0]) != 3:
+            raise ValueError(
+                "ValueError: player_ship_image_files[0] must have three "
+                "elements ")
+        for filename in player_ship_image_files[0]:
+            if not isinstance(filename, str):
+                raise TypeError("TypeError: elements in "
+                                "player_ship_image_files[0] must be strings")
+        if not isinstance(player_ship_image_files[1], (int, float)):
+            raise TypeError("TypeError: player_ship_image_files[1] must be a "
+                            "numeric type")
+        if player_ship_image_files[1] <= 0:
+            raise ValueError("ValueError: player_ship_image_files[1] must be "
+                             "positive")
+        if not isinstance(player_ship_image_files[2], (int, float)):
+            raise TypeError("TypeError: player_ship_image_files[2] must be a "
+                            "numeric type")
+
+        # player_laser_image_file
+        if not isinstance(player_laser_image_file, tuple):
+            raise TypeError("TypeError: player_laser_image_file must be a "
+                            "tuple")
+        if len(player_laser_image_file) != 3:
+            raise ValueError(
+                "ValueError: player_laser_image_file must have three elements")
+        if not isinstance(player_laser_image_file[0], str):
+            raise TypeError(
+                "TypeError: player_laser_image_file[0] must be a string")
+        if not isinstance(player_laser_image_file[1], (int, float)):
+            raise TypeError(
+                "TypeError: player_laser_image_file[1] must be a "
+                "numeric type")
+        if player_laser_image_file[1] <= 0:
+            raise ValueError(
+                "ValueError: player_laser_image_file[1] must be positive")
+        if not isinstance(player_laser_image_file[2], (int, float)):
+            raise TypeError(
+                "TypeError: player_laser_image_file[2] must be a "
+                "numeric type")
+
+        # enemy_ship_image_files
+        if not isinstance(enemy_ship_image_files, tuple):
+            raise TypeError("TypeError: enemy_ship_image_files must be a "
+                            "tuple")
+        if len(enemy_ship_image_files) != 3:
+            raise ValueError(
+                "ValueError: enemy_ship_image_files must have three elements")
+        if not isinstance(enemy_ship_image_files[0], tuple):
+            raise TypeError(
+                "TypeError: enemy_ship_image_files[0] must be a tuple")
+        if len(enemy_ship_image_files[0]) < 2:
+            raise ValueError(
+                "ValueError: enemy_ship_image_files[0] must have at least"
+                " two elements")
+        for filename in enemy_ship_image_files[0]:
+            if not isinstance(filename, str):
+                raise TypeError("TypeError: elements in "
+                                "enemy_ship_image_files[0] must be strings")
+        if not isinstance(enemy_ship_image_files[1], (int, float)):
+            raise TypeError(
+                "TypeError: enemy_ship_image_files[1] must be a "
+                "numeric type")
+        if enemy_ship_image_files[1] <= 0:
+            raise ValueError(
+                "ValueError: enemy_ship_image_files[1] must be "
+                "positive")
+        if not isinstance(enemy_ship_image_files[2], (int, float)):
+            raise TypeError(
+                "TypeError: enemy_ship_image_files[2] must be a "
+                "numeric type")
+
+        # enemy_laser_image_file
+        if not isinstance(enemy_laser_image_file, tuple):
+            raise TypeError("TypeError: enemy_laser_image_file must be a "
+                            "tuple")
+        if len(enemy_laser_image_file) != 3:
+            raise ValueError(
+                "ValueError: enemy_laser_image_file must have three elements")
+        if not isinstance(enemy_laser_image_file[0], str):
+            raise TypeError(
+                "TypeError: enemy_laser_image_file[0] must be a string")
+        if not isinstance(enemy_laser_image_file[1], (int, float)):
+            raise TypeError(
+                "TypeError: enemy_laser_image_file[1] must be a "
+                "numeric type")
+        if enemy_laser_image_file[1] <= 0:
+            raise ValueError(
+                "ValueError: enemy_laser_image_file[1] must be positive")
+        if not isinstance(enemy_laser_image_file[2], (int, float)):
+            raise TypeError(
+                "TypeError: enemy_laser_image_file[2] must be a "
+                "numeric type")
+
+        # asteroid_image_files
+        if not isinstance(asteroid_image_files, tuple):
+            raise TypeError("TypeError: asteroid_image_files must be a "
+                            "tuple")
+        if len(asteroid_image_files) != 2:
+            raise ValueError(
+                "ValueError: asteroid_image_files must have two elements")
+        if not isinstance(asteroid_image_files[0], list):
+            raise TypeError(
+                "TypeError: asteroid_image_files[0] must be a list")
+        if len(asteroid_image_files[0]) <= 0:
+            raise ValueError("ValueError: asteroid_image_files[0] must have"
+                             "at least one element")
+        for filename in asteroid_image_files[0]:
+            if not isinstance(filename, str):
+                raise TypeError(
+                    "TypeError: elements of asteroid_image_files[0]"
+                    " must be strings")
+        if not isinstance(asteroid_image_files[1], (int, float)):
+            raise TypeError(
+                "TypeError: asteroid_image_files[1] must be a "
+                "numeric type")
+        if asteroid_image_files[1] <= 0:
+            raise ValueError(
+                "ValueError: asteroid_image_files[1] must be positive")
+
+        # Sounds
+        if not isinstance(background_music, str):
+            raise TypeError("TypeError: background_music must be a string")
+        if not isinstance(player_laser_sound, str):
+            raise TypeError("TypeError: player_laser_sound must be a string")
+        if not isinstance(enemy_laser_sound, str):
+            raise TypeError("TypeError: enemy_laser_sound must be a string")
+        if not isinstance(explosion_sound, str):
+            raise TypeError("TypeError: explosion_sound must be a string")
+        if not isinstance(level_up_sound, str):
+            raise TypeError("TypeError: level_up_sound must be a string")
+        if not isinstance(lost_life_sound, str):
+            raise TypeError("TypeError: lost_life_sound must be a string")
+        if not isinstance(win_sound, str):
+            raise TypeError("TypeError: win_sound must be a string")
+        if not isinstance(game_over_sound, str):
+            raise TypeError("TypeError: game_over_sound must be a string")
+
         super().__init__()
 
         arcade.set_background_color((0, 0, 0))
@@ -1046,9 +1289,12 @@ class GameView(arcade.View):
                            self.enemy_ship_filenames[0],
                            self.enemy_ship_filenames[1]),
             'starting enemies': (0, 10, 5),
-            'enemy spawn rate': (0, .5, .5),  # per second
-            'enemy speed range': ((50, 100), (30, 80), (80, 130)),    # pixels per second
-            'enemy laser fade': (255, 40, 40),  # updates before fade
+            # per second
+            'enemy spawn rate': (0, .5, .5),
+            # pixels per second
+            'enemy speed range': ((50, 100), (30, 80), (80, 130)),
+            # amount alpha it loses at each update after 60 updates
+            'enemy laser fade': (255, 40, 40),
             'starting asteroids': (10, 0, 10),
             'asteroid spawn rate': (1, 0, 1),
             'asteroid speed range': ((50, 200), (50, 200), (100, 200))}
@@ -1153,7 +1399,7 @@ class GameView(arcade.View):
         self.player_sprite.center_x = self.width // 2
         self.player_sprite.center_y = self.height // 2
 
-        # Though the player_list only holds one sprite, using a spritelist
+        # Though the player_list only holds one sprite, using a SpriteList
         # instead of the sprite itself for updating and drawing means that
         # MyGameWindow can have a player_sprite attribute without it getting
         # drawn or updated (eg after the player dies) if the sprite is just
@@ -1184,6 +1430,22 @@ class GameView(arcade.View):
                        speed_range: Union[int, Tuple[int], Tuple[int, int],
                                           Tuple[int, int, int]]) -> None:
 
+        # Validate parameters
+        if not isinstance(num_asteroids, int):
+            raise TypeError("TypeError: num_asteroids must be an int")
+        if num_asteroids <= 0:
+            raise ValueError("ValueError: num_asteroids must be positive")
+        if not isinstance(speed_range, (int, tuple)):
+            raise TypeError("TypeError: speed_range must be an int or tuple")
+        if isinstance(speed_range, tuple):
+            if not 1 <= len(speed_range) <= 3:
+                raise ValueError("ValueError: speed_range must have 1, 2 or 3"
+                                 " elements")
+            for elem in speed_range:
+                if not isinstance(elem, int):
+                    raise TypeError("TypeError: elements of speed_range must"
+                                    " be integers")
+
         for i in range(num_asteroids):
             asteroid = Asteroid(random.choice(self.asteroid_filenames),
                                 self.asteroid_image_scale)
@@ -1202,6 +1464,22 @@ class GameView(arcade.View):
     def make_enemy_ships(self, num_enemies: int,
                          speed_range: Union[int, Tuple[int], Tuple[int, int],
                                             Tuple[int, int, int]]) -> None:
+
+        # Validate parameters
+        if not isinstance(num_enemies, int):
+            raise TypeError("TypeError: num_enemies must be an int")
+        if num_enemies <= 0:
+            raise ValueError("ValueError: num_enemies must be positive")
+        if not isinstance(speed_range, (int, tuple)):
+            raise TypeError("TypeError: speed_range must be an int or tuple")
+        if isinstance(speed_range, tuple):
+            if not 1 <= len(speed_range) <= 3:
+                raise ValueError("ValueError: speed_range must have 1, 2 or 3"
+                                 " elements")
+            for elem in speed_range:
+                if not isinstance(elem, int):
+                    raise TypeError("TypeError: elements of speed_range must"
+                                    " be integers")
 
         for i in range(num_enemies):
             # Pass laser list to enemy so enemy can fill it
@@ -1226,9 +1504,10 @@ class GameView(arcade.View):
 
             self.enemy_list.append(enemy)
 
-    # TODO: ASK I THINK these and other window methods return None since I don't
-    #  return anything, but there's some weird stuff going on with these
-    #  inherited methods, like how on_update gets called with delta_time
+    # TODO: ASK I THINK these and other window methods return None since I
+    #  don't return anything, but there's some weird stuff going on with
+    #  these inherited methods, like how on_update gets called with
+    #  delta_time
     def on_draw(self) -> None:
 
         # This clears the screen for the following drawings to work
@@ -1266,6 +1545,12 @@ class GameView(arcade.View):
         Main game logic
         """
 
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # Check whether or not the player should level up and whether or not
         # they die before anything else because if either happens, everything
         # else gets reset and there's no point in updating movement that will
@@ -1283,8 +1568,8 @@ class GameView(arcade.View):
             self.update_lives_based_on_hits()
 
         # Increment count of updates this level after level_up_if_points()
-        # that calls setup, which returns to it, which returns to on_update, which
-        # then continues, and we want to count this update
+        # that calls setup, which returns to it, which returns to on_update,
+        # which then continues, and we want to count this update
         self.updates_this_level += 1
 
         # Check collisions
@@ -1357,18 +1642,16 @@ class GameView(arcade.View):
         if not self.dying:
             hits = []
             for player in self.player_list:
-                h = arcade.check_for_collision_with_lists(player,
-                                                          [self.asteroid_list,
-                                                           self.enemy_laser_list,
-                                                           self.enemy_list])
+                h = arcade.check_for_collision_with_lists(
+                    player, [self.asteroid_list, self.enemy_laser_list,
+                             self.enemy_list])
                 hits += h
 
             if hits:
-                self.explosion_list.append(Explosion(self.explosion_textures,
-                                                     self.player_sprite.center_x,
-                                                     self.player_sprite.center_y,
-                                                     self.explosion_image_scale,
-                                                     self.explosion_sound))
+                self.explosion_list.append(Explosion(
+                    self.explosion_textures, self.player_sprite.center_x,
+                    self.player_sprite.center_y, self.explosion_image_scale,
+                    self.explosion_sound))
 
                 for hit in hits:
                     hit.remove_from_sprite_lists()
@@ -1424,7 +1707,7 @@ class GameView(arcade.View):
         asteroids_hit = []
         enemies_hit = []
 
-        # There's not a method to check for collisions between one Spritelist
+        # There's not a method to check for collisions between one SpriteList
         # and one or more others, so must iterate over player_laser_list
 
         # Iterate backwards over list of lasers to avoid IndexErrors as lasers
@@ -1443,7 +1726,8 @@ class GameView(arcade.View):
             if a or e:
                 self.player_laser_list[i].remove_from_sprite_lists()
 
-                # Add these hit ateroids and enemies to lists of all hit asteroids
+                # Add these hit asteroids and enemies to lists of all hit
+                # asteroids
                 # and enemies
                 asteroids_hit += a
                 enemies_hit += e
@@ -1451,7 +1735,6 @@ class GameView(arcade.View):
         # Add points for each hit
         self.points += self.asteroid_points * len(asteroids_hit)
         self.points += self.enemy_points * len(enemies_hit)
-
 
         # Remove hit sprites. Leave explosions where they were
         self.remove_and_explode(asteroids_hit)
@@ -1461,6 +1744,12 @@ class GameView(arcade.View):
         """
         Removes all sprites from list, leaving explosions where they were.
         """
+
+        # Validate parameters
+        if not isinstance(sprite_list, arcade.SpriteList):
+            raise TypeError("TypeError: sprite_list must be an "
+                            "arcade.SpriteList")
+
         for sprite in sprite_list:
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  sprite.center_x,
@@ -1551,8 +1840,15 @@ class GameView(arcade.View):
                     elif enemy.speed > -100:
                         enemy.speed *= 1.2
 
-    # TODO: ASK Not sure about return vals....I don't call this function
+    # TODO: ASK Not sure about return values....I don't call this function
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         # Gracefully quit program
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -1613,6 +1909,12 @@ class GameView(arcade.View):
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
 
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         if symbol == arcade.key.RIGHT:
             self.right_pressed = False
         if symbol == arcade.key.LEFT:
@@ -1641,6 +1943,21 @@ class GameView(arcade.View):
 
 class FadingView(arcade.View):
     def __init__(self, fade_rate: int, alpha: int):
+
+        # Validate parameters
+        if not isinstance(fade_rate, int):
+            raise TypeError("TypeError: fade_rate must be an integer")
+        if fade_rate < 0:
+            fade_rate = 0
+        elif fade_rate > 255:
+            fade_rate = 255
+        if not isinstance(alpha, int):
+            raise TypeError("TypeError: alpha must be an integer")
+        if alpha < 0:
+            alpha = 0
+        elif alpha > 255:
+            alpha = 255
+
         super().__init__()
 
         self.alpha = alpha
@@ -1672,6 +1989,10 @@ class FadingView(arcade.View):
 
 class TitleView(FadingView):
     def __init__(self, game_view: GameView):
+
+        if not isinstance(game_view, GameView):
+            raise TypeError("game_view must be an instance of GameView")
+
         super().__init__(5, 0)
 
         arcade.set_background_color((0, 0, 0))
@@ -1690,6 +2011,13 @@ class TitleView(FadingView):
                           (0, self.window.height))
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         if self.faded_out:
             instructions = InstructionsView(self.game_view)
             self.window.show_view(instructions)
@@ -1718,6 +2046,13 @@ class TitleView(FadingView):
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
             self.window.show_view(self.game_view)
@@ -1737,6 +2072,10 @@ class TitleView(FadingView):
 
 class InstructionsView(FadingView):
     def __init__(self, game_view: GameView):
+
+        if not isinstance(game_view, GameView):
+            raise TypeError("game_view must be an instance of GameView")
+
         super().__init__(5, 0)
 
         arcade.set_background_color((0, 0, 0))
@@ -1763,6 +2102,13 @@ class InstructionsView(FadingView):
                           (0, self.window.height))
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         if not self.faded_in:
             self.faded_in = self.fade_in()
 
@@ -1785,6 +2131,13 @@ class InstructionsView(FadingView):
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         if symbol == arcade.key.SPACE:
             self.window.show_view(self.game_view)
 
@@ -1841,6 +2194,13 @@ class GameLostView(arcade.View):
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         # Gracefully quit program
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -1863,6 +2223,14 @@ class GameLostView(arcade.View):
 class GameWonView(arcade.View):
     def __init__(self, player: pyglet.media.player.Player = None,
                  sound: arcade.Sound = None):
+
+        # Validate parameters
+        if not isinstance(player, pyglet.media.player.Player):
+            raise TypeError("TypeError: player must be a "
+                            "pyglet.media.player.Player")
+        if not isinstance(sound, arcade.Sound):
+            raise TypeError("TypeError: sound must be an arcade.Sound")
+
         super().__init__()
 
         arcade.set_background_color((0, 0, 0))
@@ -1903,6 +2271,13 @@ class GameWonView(arcade.View):
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         # Gracefully quit program
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -1922,6 +2297,10 @@ class GameWonView(arcade.View):
 
 class PauseView(arcade.View):
     def __init__(self, game_view: GameView):
+
+        if not isinstance(game_view, GameView):
+            raise TypeError("game_view must be an instance of GameView")
+
         super().__init__()
 
         self.game_view = game_view
@@ -1981,6 +2360,13 @@ class PauseView(arcade.View):
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
         # Gracefully quit program
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -2032,12 +2418,12 @@ def textures_from_spritesheet(filename: str, texture_width: int,
         raise TypeError("filename must be a string")
     if not isinstance(texture_width, int):
         raise TypeError("texture_width must be an integer")
-    if texture_width < 0:
-        raise TypeError("texture_width must be non-negative")
+    if texture_width <= 0:
+        raise TypeError("texture_width must be positive")
     if not isinstance(texture_height, int):
         raise TypeError("texture_height must be an integer")
-    if texture_height < 0:
-        raise TypeError("texture_height must be non-negative")
+    if texture_height <= 0:
+        raise TypeError("texture_height must be positive")
     if not isinstance(columns, int):
         raise TypeError("columns must be an integer")
     if columns <= 0:
@@ -2046,10 +2432,18 @@ def textures_from_spritesheet(filename: str, texture_width: int,
         raise TypeError("num_textures must be an integer")
     if num_textures < 0:
         raise TypeError("num_textures must be non-negative")
+    if not isinstance(skip_rate, int):
+        raise TypeError("skip_rate must be an integer")
+    if num_textures <= 0:
+        raise TypeError("skip_rate must be positive")
 
     # List of textures (frames of an animation; ways the sprite can look, eg
     # standing facing right vs crouching)
     textures = []
+
+    # Don't throw an error for 0 textures, but return before calling range()
+    if num_textures == 0:
+        return textures
 
     # Iterate over spritesheet
     for i in range(0, num_textures, skip_rate):
@@ -2108,7 +2502,8 @@ def main():
 
     # Make tuples of each sprite's image filename(s) and scale
     player_ship_data = (PLAYER_SHIPS, PLAYER_SHIP_SCALE, PLAYER_SHIP_ROTATION)
-    player_laser_data = (PLAYER_LASER, PLAYER_LASER_SCALE, PLAYER_LASER_ROTATION)
+    player_laser_data = (PLAYER_LASER, PLAYER_LASER_SCALE,
+                         PLAYER_LASER_ROTATION)
     enemy_ship_data = (ENEMY_SHIPS, ENEMY_SHIP_SCALE, ENEMY_SHIP_ROTATION)
     enemy_laser_data = (ENEMY_LASER, ENEMY_LASER_SCALE, ENEMY_LASER_ROTATION)
     asteroid_data = (asteroid_filenames, ASTEROID_SCALE)
@@ -2123,15 +2518,16 @@ def main():
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
     game_parameters = (explosion_data, player_ship_data, player_laser_data,
-                         enemy_ship_data, enemy_laser_data, asteroid_data,
-                         BACKGROUND_SOUND, PLAYER_LASER_SOUND,
-                         ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
-                         LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
+                       enemy_ship_data, enemy_laser_data, asteroid_data,
+                       BACKGROUND_SOUND, PLAYER_LASER_SOUND,
+                       ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
+                       LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
 
     # The asterisk unpacks the tuple so it's like I'm passing it 14 arguments
     game_view = GameView(*game_parameters)
     game_view.setup()
-    # TODO IS THIS OKAY PRATICE OR DO I NEED TO PASS IT AS A PARAM FROM ONE TO THE NEXT?
+    # TODO IS THIS OKAY PRACTICE OR DO I NEED TO PASS IT AS A PARAM FROM ONE
+    #  TO THE NEXT?
     # Store game_parameters as Window attribute so all view objects can access
     window.game_parameters = game_parameters
     # Start with title view, which calls the next view, which calls the next...
