@@ -175,17 +175,56 @@ class Player(arcade.Sprite):
     """
 
     def __init__(self, image_filename: str, scale: Union[int, float],
-                 image_rotation: int, laser_filename: str,
-                 laser_scale: Union[int, float], laser_rotation: int,
+                 image_rotation: Union[int, float], laser_filename: str,
+                 laser_scale: Union[int, float],
+                 laser_rotation: Union[int, float],
                  laser_list: arcade.SpriteList, window_dims: Tuple[int, int],
                  laser_fade_rate: Union[int, float] = 15,
                  laser_sound: Optional[arcade.Sound] = None):
-        super().__init__(filename=image_filename, scale=scale)
         """
         Constructor. Sets attributes self.speed, self.angle_rate and 
         self.forward_rate. Uses arcade.Sprite default settings for other
         attributes, including self.angle.
         """
+
+        # Validate parameters
+        if not isinstance(image_filename, str):
+            raise TypeError("TypeError: image_filename must be a string")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+        if not isinstance(image_rotation, (int, float)):
+            raise TypeError("TypeError: image_rotation must be a numeric type")
+        if not isinstance(laser_filename, str):
+            raise TypeError("TypeError: laser_filename must be a string")
+        if not isinstance(laser_scale, (int, float)):
+            raise TypeError("TypeError: laser_scale must be a numeric type")
+        if laser_scale <= 0:
+            raise ValueError("ValueError: laser_scale must be positive")
+        if not isinstance(laser_rotation, (int, float)):
+            raise TypeError("TypeError: laser_rotation must be a numeric type")
+        if not isinstance(laser_list, arcade.SpriteList):
+            raise TypeError("TypeError: laser_list must be an"
+                            " arcade.SpriteList")
+        if not isinstance(window_dims, tuple):
+            raise TypeError("TypeError: window_dims must be a tuple")
+        if len(window_dims) != 2:
+            raise ValueError("ValueError: window_dims must have length 2")
+        for dim in window_dims:
+            if not isinstance(dim, int):
+                raise TypeError("TypeError: window_dims elements must be ints")
+            if dim <= 0:
+                raise ValueError("ValueError: window_dim elements must be"
+                                 " positive")
+        if not isinstance(laser_fade_rate, (int, float)):
+            raise TypeError("TypeError: laser_fade_rate must be numeric")
+        if laser_fade_rate < 0:
+            laser_fade_rate = 0
+        if laser_sound and not isinstance(laser_sound, arcade.Sound):
+            raise TypeError("TypeError: laser_sound must be an arcade.Sound")
+
+        super().__init__(filename=image_filename, scale=scale)
 
         # Degrees the image needs to be rotated to face North
         self.image_rotation = image_rotation
@@ -249,6 +288,12 @@ class Player(arcade.Sprite):
         :return: None
         """
 
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # Turn player and move forwards or backwards
         self.turn_and_move(delta_time)
 
@@ -256,6 +301,13 @@ class Player(arcade.Sprite):
         self.shoot_lasers()
 
     def turn_and_move(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # Update angle player is facing
         # Multiply by delta_time for smooth movement
         self.angle += self.change_angle * delta_time
@@ -309,6 +361,29 @@ class Laser(arcade.Sprite):
                  angle: Union[int, float] = 0, speed: Union[int, float] = 200,
                  fade_rate: Union[int, float] = 0,
                  sound: Optional[arcade.Sound] = None):
+
+        # Validate parameters
+        if not isinstance(x, (int, float)):
+            raise TypeError("TypeError: x must be a numeric type")
+        if not isinstance(y, (int, float)):
+            raise TypeError("TypeError: y must be a numeric type")
+        if not isinstance(image_filename, str):
+            raise TypeError("TypeError: image_filename must be a string")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+        if not isinstance(angle, (int, float)):
+            raise TypeError("TypeError: angle must be a numeric type")
+        if not isinstance(speed, (int, float)):
+            raise TypeError("TypeError: speed must be a numeric type")
+        if not isinstance(fade_rate, (int, float)):
+            raise TypeError("TypeError: fade_rate must be a numeric type")
+        if fade_rate < 0:
+            fade_rate = 0
+        if sound and not isinstance(sound, arcade.Sound):
+            raise TypeError("TypeError: sound must be an arcade.Sound")
+
         super().__init__(filename=image_filename, scale=scale, center_x=x,
                          center_y=y, angle=angle, )
 
@@ -335,6 +410,13 @@ class Laser(arcade.Sprite):
             self.player = sound.play()
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # used to track when to spawn laser and when it should die
         self.frames += 1
         # Always move in the same direction at the same rate
@@ -369,6 +451,21 @@ class TargetingSprite(arcade.Sprite):
     def __init__(self, image_filename: str, scale: Union[int, float],
                  file_rotation: int = 0,  target_x: Union[int, float] = 0,
                  target_y: Union[int, float] = 0):
+
+        # Validate parameters
+        if not isinstance(image_filename, str):
+            raise TypeError("TypeError: image_filename must be a string")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+        if not isinstance(file_rotation, (int, float)):
+            raise TypeError("TypeError: file_rotation must be a numeric type")
+        if not isinstance(target_x, (int, float)):
+            raise TypeError("TypeError: target_x must be a numeric type")
+        if not isinstance(target_y, (int, float)):
+            raise TypeError("TypeError: target_y must be a numeric type")
+
         super().__init__(filename=image_filename, scale=scale)
 
         # Initialize speed to not moving
@@ -390,6 +487,13 @@ class TargetingSprite(arcade.Sprite):
         self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
 
     def on_update(self, delta_time: float = 1 / 60) -> float:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         # Get x and y distance to target from current position
         x_distance = self.target_x - self.center_x
         y_distance = self.target_y - self.center_y
@@ -437,11 +541,32 @@ class TargetingSprite(arcade.Sprite):
         return angle_rad
 
     def set_target(self, x: Union[int, float], y: Union[int, float]) -> None:
+
+        if not isinstance(x, (int, float)):
+            raise TypeError("TypeError: x must be a numeric type")
+        if not isinstance(y, (int, float)):
+            raise TypeError("TypeError: y must be a numeric type")
+
         self.target_x = x
         self.target_y = y
 
-    def set_random_offscreen_location(self, screen_width: int,
-                                      screen_height: int) -> None:
+    def get_random_offscreen_point(self, screen_width: Union[int, float],
+                                   screen_height: Union[
+                                       int, float]) -> Tuple[int, int]:
+        """
+        Returns the coordinates of a random point offscreen. Point is not
+        far offscreen, but far enough to hid sprite.
+        """
+        # Validate parameters
+        if not isinstance(screen_width, (int, float)):
+            raise TypeError("TypeError: screen_width must be a numeric type")
+        if screen_width <= 0:
+            raise ValueError("ValueError: screen_width must be positive")
+        if not isinstance(screen_height, (int, float)):
+            raise TypeError("TypeError: screen_height must be a numeric type")
+        if screen_height <= 0:
+            raise ValueError("ValueError: screen_height must be positive")
+
         # Get coordinates of random point offscreen by getting a random
         # x and a corresponding y that makes it work
 
@@ -471,100 +596,146 @@ class TargetingSprite(arcade.Sprite):
             y = random.randrange(-self.diagonal,
                                  screen_height + self.diagonal)
 
-        self.center_x = x
-        self.center_y = y
+        return x, y
+
+    def set_random_offscreen_location(self, screen_width: Union[int, float],
+                                      screen_height: Union[
+                                          int, float]) -> None:
+        """
+        Sets sprite's location to random point offscreen point such that
+        sprite won't be visible.
+        """
+
+        point = self.get_random_offscreen_point(screen_width, screen_height)
+
+        self.center_x = point[0]
+        self.center_y = point[1]
+
+    @staticmethod
+    def get_random_in_range(num_range: Union[int, Tuple[int], Tuple[int, int],
+                                             Tuple[int, int, int]]) -> int:
+        """
+        Returns a random number within the given range. The range is slightly
+        more flexible than the Python range() function, but its elements serve
+        the same purpose: (start, stop, step). If only start is given, if start
+        and stop are equal, or if the step is 0, then the return value will be
+        equal start. Otherwise, it will return a random number within the given
+        range. Ranges like (5, -3, 2), which are invalid for other range
+        functions, will be rearranged to be valid, for example, (5, -3, 2) -->
+        (5, -3, -2). Note: this method allows for negative return values.
+
+        Used by class for set_speed_in_range() and set_random_spin().
+        """
+
+        # Validate parameters
+        if not isinstance(num_range, (int, tuple)):
+            raise TypeError("TypeError: num_range must be an int or a tuple"
+                            " of ints")
+        if isinstance(num_range, tuple):
+            if not 1 <= len(num_range) <= 3:
+                raise ValueError("ValueError: num_range must have length"
+                                 " 1, 2 or 3")
+            for num in num_range:
+                if not isinstance(num, int):
+                    raise TypeError("TypeError: num_range's elements must "
+                                    "be integers")
+
+        # If num_range isn't really a range because it's only one number or
+        # because the start and end of the range are the same, set speed to
+        # that number
+        if isinstance(num_range, int):
+            return num_range
+        if len(num_range) == 1 or num_range[0] == num_range[1]:
+            return num_range[0]
+
+        # Set step
+        if len(num_range) == 2:
+            step = 1
+        else:
+            step = num_range[2]
+
+            # If step is zero, then num_range can't be traversed, so make
+            # speed first number in range
+            if step == 0:
+                return num_range[0]
+
+        # The range from num_range[0] to num_range[1] must be able to be
+        # traversed using the step size. Can only get from smaller number to
+        # bigger number with positive steps, or from bigger to smaller using
+        # negative steps. If the sign of the step doesn't match the given
+        # range, change the sign of the step
+        if not ((num_range[0] < num_range[1] and step > 0)
+                or num_range[0] > num_range[1] and step < 0):
+            step *= -1
+
+        return random.randrange(num_range[0], num_range[1], step)
 
     def set_speed_in_range(self,
                            speed_range: Union[int, Tuple[int], Tuple[int, int],
                                               Tuple[int, int, int]]) -> None:
         """
-        Sets the sprites speed to a number within the given range. The range
-        is slightly more flexible than the Python range() function, but its
-        elements serve the same purpose: (start, stop, step). If only start
-        is given, if start and stop are equal, or if the step is 0, then
-        speed will be set to start. Otherwise, speed will be a random number
-        within the given range. Normally invalid ranges like (5, -3, 2) will
-        be rearranged to be valid, for example, (5, -3, 2) --> (5, -3, -2).
+        Sets the sprites speed to a number within the given range.
         Note: this method allows for negative speeds. That's intentional
         since later extensions may want the ability to move away from targets.
         """
 
-        # Validate parameters
-        if (not isinstance(speed_range, int)
-                and not isinstance(speed_range, tuple)):
-            raise TypeError("TypeError: Speed range must be an int or a tuple"
-                            " of ints")
-        if isinstance(speed_range, tuple):
-            if not 1 <= len(speed_range) <= 3:
-                raise ValueError("ValueError: Speed range must have length"
-                                 " 1, 2 or 3")
-            for num in speed_range:
-                if not isinstance(num, int):
-                    raise TypeError("TypeError: Speed range's elements must "
-                                    "be integers")
-
-        # If speed_range isn't really a range because it's only one number or
-        # because the start and end of the range are the same, set speed to
-        # that number
-        if isinstance(speed_range, int):
-            self.speed = speed_range
-            return
-        if len(speed_range) == 1:
-            self.speed = speed_range[0]
-            return
-        if speed_range[0] == speed_range[1]:
-            self.speed = speed_range[0]
-            return
-
-        # Set step
-        if len(speed_range) == 2:
-            step = 1
-        else:
-            step = speed_range[2]
-
-            # If step is zero, then speed_range can't be traversed, so make
-            # speed first number in range
-            if step == 0:
-                self.speed = speed_range[0]
-                return
-
-        # The range from speed_range[0] to speed_range[1] must be able to be
-        # traversed using the step size. Can only get from smaller number to
-        # bigger number with positive steps, or from bigger to smaller using
-        # negative steps. If the sign of the step doesn't match the given
-        # range, change the step
-        if not ((speed_range[0] < speed_range[1] and step > 0)
-                or speed_range[0] > speed_range[1] and step < 0):
-            step *= -1
-
-        self.speed = random.randrange(speed_range[0], speed_range[1], step)
+        # Don't validate parameters here because validation is done in
+        # get_random_in_range, which raises and handles the same errors this
+        # should
+        self.speed = self.get_random_in_range(speed_range)
 
     # Though this is currently only used by asteroid, not enemy, it could be
     # useful for a later extension of the class (eg to make enemies spin
     # out of control after getting shot)
-    def set_random_spin(self, speed_range: tuple = (-5, 6, 2)) -> None:
-        # Validate parameters
-        if not isinstance(speed_range, tuple):
-            raise TypeError("Speed range must be a 2- or 3-tuple")
-        if not 2 <= len(speed_range) <= 3:
-            raise ValueError("Speed range must have length 2 or 3")
-        for num in speed_range:
-            if not isinstance(num, int):
-                raise TypeError("Speed range's elements must be integers")
+    def set_random_spin(self,
+                        speed_range: Union[
+                            int, Tuple[int], Tuple[int, int],
+                            Tuple[int, int, int]] = (-5, 6, 2)) -> None:
+        """
+        Sets the sprite's change_angle to a number within the given range.
+        """
 
-        # Set step
-        if len(speed_range) == 2:
-            step = 1
-        else:
-            step = speed_range[2]
+        # Don't validate parameters here because validation is done in
+        # get_random_in_range, which raises and handles the same errors this
+        # should
+        self.change_angle = self.get_random_in_range(speed_range)
 
-        self.change_angle = random.randrange(speed_range[0], speed_range[1],
-                                             step)
+    def set_random_offscreen_target(self, screen_width: Union[int, float],
+                                    screen_height: Union[int, float]) -> None:
+        """
+        Sets sprite's target to random point offscreen point such that
+        sprite won't be visible once it reaches that point
+        """
+
+        # Don't validate parameters here because validation is done in
+        # get_random_offscreen_point, which raises and handles the same errors
+        # this should
+        point = self.get_random_offscreen_point(screen_width, screen_height)
+
+        self.target_x = point[0]
+        self.target_y = point[1]
 
     # Asteroid uses this but EnemyShip doesn't. I think it's useful to have
     # here in case other classes extend this and need to cross the screen
-    def set_random_cross_screen_target(self, screen_width: int,
-                                       screen_height: int) -> None:
+    def set_random_cross_screen_target(self, screen_width: Union[int, float],
+                                       screen_height: Union[
+                                           int, float]) -> None:
+        """
+        Set sprite's target to random point across the screen. "Across the
+        screen" means that the sprite will have to cross some part of the
+        screen in order to reach the target.
+        """
+
+        # Validate parameters
+        if not isinstance(screen_width, (int, float)):
+            raise TypeError("TypeError: screen_width must be a numeric type")
+        if screen_width <= 0:
+            raise ValueError("ValueError: screen_width must be positive")
+        if not isinstance(screen_height, (int, float)):
+            raise TypeError("TypeError: screen_height must be a numeric type")
+        if screen_height <= 0:
+            raise ValueError("ValueError: screen_height must be positive")
+
         if self.center_x < 0:
             self.target_x = screen_width + self.diagonal
         elif self.center_x > screen_width:
@@ -590,9 +761,25 @@ class TargetingSprite(arcade.Sprite):
 
 class Asteroid(TargetingSprite):
     def __init__(self, image_filename: str, scale: Union[int, float]):
+
+        # Validate parameters
+        if not isinstance(image_filename, str):
+            raise TypeError("TypeError: image_filename must be a string")
+        if not isinstance(scale, (int, float)):
+            raise TypeError("TypeError: scale must be a numeric type")
+        if scale <= 0:
+            raise ValueError("ValueError: scale must be positive")
+
         super().__init__(image_filename, scale)
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+
+        # Validate parameters
+        if not isinstance(delta_time, (int, float)):
+            raise TypeError("TypeError: delta_time must be numeric")
+        if delta_time < 0:
+            raise ValueError("ValueError: delta_time must be non-negative")
+
         super().on_update(delta_time)
 
         # Spin asteroid
@@ -619,6 +806,8 @@ class EnemyShip(TargetingSprite):
                  laser_speed: int = 0,
                  laser_fade_rate: Union[int, float] = 40,
                  laser_sound: Optional[arcade.Sound] = None):
+
+
 
         super().__init__(image_filename, scale, file_rotation=image_rotation)
 
