@@ -1,98 +1,141 @@
 """
 I-M Siegel
 
-Explosion graphics from https://www.explosiongenerator.com/, via Arcade
-resources
+This program runs a space-shooter computer game and contains several classes
+that can be imported and used by other programs to make other games.
 
-Other images from Space Shooter (Redux, plus fonts and sounds) by Kenney
+----------------------------------------------------------------------------
+
+The contents of this file may be split into three sections:
+- Sprite classes
+- View classes, and GameView
+- Global variables, helper functions and main()
+
+Sprite classes:
+This program contains six classes that extend the arcade.Sprite class. These
+represent 'sprites' on the screen, which include the primary elements of the
+game like the player's character, enemy space ships, lasers, explosions, etc.
+These sprites don't access global variables, and, with the exception of
+Player sprites and EnemyShip sprites, which both create instances of Laser
+sprites, the sprites don't call each other. This means that the sprites can
+be imported into other programs to be used as independent elements of other
+games.
+
+View classes:
+The program contains seven classes that extend the arcade.View class. These
+represent the various screens that a user sees (title, instructions, main
+game, game over, etc.).
+
+These classes are interconnected (for example, a GameView may create a
+PauseView object if the user hits pause, a GameLostView if the player loses,
+or a GameWonView if the player wins, and each of these may create instances
+of GameView). This means that, except for FadingView, these classes can't be
+imported into other projects independently of each other, but most of the
+View subclasses may serve as templates for title, instruction, pause, and
+game over screens for other games.
+
+GameView:
+The primary logic for the game is controlled by the GameView class. This
+class manages interactions between the user and the game, translates keyboard
+input into sprite movement, creates sprites, tracks game levels and lives,
+etc.
+
+In this game, the user spins and moves their space ship, and tries to shoot
+asteroids and enemy ships without crashing or getting shot. GameView decides
+what player input leads to what action on the part of the Player sprite. It
+also determines level settings, like how many asteroids or enemy ships should
+appear on each level and how fast they should go, and how many points the
+player needs to get in order to advance.
+
+GameView creates instances of various Sprite subclasses and directly accesses
+their attributes, meaning that it cannot be used independently of the sprites.
+However, all of the View subclasses do operate independently of the program's
+global variables.
+
+Global Variables, Helper Functions, and Main:
+This program's global variables and main function determine much of the look
+and sound of the game. The global variables hold the data concerning which
+images to use for each sprite (eg deciding if the player looks like a space
+ship or a dragon), and what sounds to use for each event (lase shots,
+leveling up, etc). Main collects the data from the global variables to pass
+to View subclasses that run the game. The images and sounds can easily be
+changed by changing the filenames stored in the global variables, and the
+result will be a game with the same logic, but a different setting and feel.
+
+----------------------------------------------------------------------------
+
+Sources:
+
+Arcade:
+This program was built with the Arcade library, which was copyrighted by
+Paul Vincent Craven and is licensed under the MIT License.
+- License: https://github.com/pythonarcade/arcade/blob/maintenance/license.rst
+
+In addition to its powerful classes, the Arcade library has many examples,
+clear documentation,and accessible source code that make it easy to learn.
+I spent days reading through documentation and source code, and experimenting
+with the library. I learned a lot from looking at the example code, the
+documentation, and by digging into the source code (including the code for
+libraries, like Pyglet, that Arcade is built on). I highly recommend checking
+out Arcade.
+- Website: https://api.arcade.academy/en/latest/
+- Documentation: https://api.arcade.academy/en/latest/arcade.html
+- Examples: https://api.arcade.academy/en/latest/examples/index.html
+- Github: https://github.com/pythonarcade/arcade/tree/maintenance
+
+AtiByte:
+Before downloading and digging into the Arcade code and docs, I learned the
+basics of Arcade from some YouTube videos by AtiByte. The videos walked
+through arcade docs and demonstated how to open arcade windows, draw shapes,
+and use keyboard input.
+- AtiByte's page:
+https://www.youtube.com/playlist?list=PL1P11yPQAo7pPlDlFEaL3IUbcWnnPcALI
+
+Graphics:
+- Explosion graphics from https://www.explosiongenerator.com/, via Arcade
+resources folder.
+- Other images from Space Shooter (Redux, plus fonts and sounds) by Kenney
 Vleugels (www.kenney.nl), licensed under Creative Commons.
 https://kenney.nl/assets/space-shooter-redux
 
-----------------------------------------------------------------------------
-----------------------------------------------------------------------------
-
-NOTE: HOW THINGS ARE BROKEN DOWN
-    - image filenames, scale and window name and dimensions belong in main,
-    helper functions and the global variables
-
-    - how each sprite class works, including shooting its lasers, belongs to
-    each sprite, general enough that it can get information like that the
-    player is trying to shoot (self.shooting) and take care of that, this
-    is how movement works.
-
-    - window class is responsible for putting all game logic together,
-    interfacing with the user, and communicating settings from file/main to
-    the sprites. This includes monitoring for key presses and updating sprite
-    attributes based on that, changing levels, determining how many sprites of
-    each kind appear and when, and scoring.
-
-----------------------------------------------------------------------------
-----------------------------------------------------------------------------
-
-TODO:
-    ------------------------------------
-    STYLE
-        - DEFENSIVE PROGRAMMING (at least in the method params, not name
-        mangling)
-        - PEP8 COMPLIANCE
-        - general structure
-        - COMMENTS
-    ------------------------------------
-    PRESENTATION
-    ------------------------------------
-    - change meteors: maybe only big and med ones at .5 scale (maybe small,
-    too)
-    - add lives?
-    - add damage
-
-    TODO: Install Python 3.10 after semester; allows for writing
-    Union[int, float] as int | float
-
-DONE:
-    - add enemy lasers
-    - add collision between player lasers and asteroids, player lasers and
-        enemy ships
-    - add collision between enemy lasers and player ship
-    - add score
-    - add explosions
-    - clean up (eg basic enemy from which asteroids and enemy ships descend)
-    - no filenames or globals hardcoded into classes other than MyGameWindow.
-    - figure out why enemy lasers shoot long when they first start
-    - differing functions for resetting for new game and resetting for level
-    (eg when points should be reset)
-    - add levels and design levels
-        - add shortcuts (cmd 1, cmd 2, cmd 3)
-    - add sounds
-    - type hints
-    - __str__ to all
-    - add start screen
-    - add end screen
+Sounds:
+- Background music and game won music come from the Apple iMovie library.
+- Other sounds come from Kenny Vleugels (www.kenney.nl), see above.
 """
 
 
 # Program built with arcade library, extends arcade classes
 import arcade
 
-# Used for game logic
+# Used for game logic and in some classes
 import math
 import random
 
 # For type hinting
 from typing import List, Tuple, Union, Optional
-import pyglet    # Although imported with arcade, needed for type hinting
+import pyglet
 
+
+# Settings - these can be changed to alter the look and feel of the game
+
+# Window settings
 SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 800
-SCREEN_TITLE = "Space Shooter"
+SCREEN_TITLE = "Spin and Shoot"
 
-# File names for sprites
+
+# Media
+
 # Using globals so they're easy to change if someone wants to use different
-# images or if the images are stored with a different filepath
+# images or sounds, or if the files are moved to have a different filepath
+
+# Images
 
 # If images come from the same pack of resources, they may be able to scale
 # together. In case any need different scaling, each has a global variable
 # for its scale. Most are set equal to IMAGE_SCALE, but all can be changed
 IMAGE_SCALE = .5
+
 
 # Player ship filenames (3 string filenames: one for each level)
 PLAYER_SHIPS = ("media/kenney_nl/spaceshooter/PNG/"
@@ -101,27 +144,33 @@ PLAYER_SHIPS = ("media/kenney_nl/spaceshooter/PNG/"
                 "Player_ships/playerShip2_blue.png",
                 "media/kenney_nl/spaceshooter/PNG/"
                 "Player_ships/playerShip3_blue.png")
-# In case image needs unique scaling
+
+# Factor by which to grow/shrink the image, in case image needs unique scaling
 PLAYER_SHIP_SCALE = IMAGE_SCALE
-PLAYER_SHIP_ROTATION = 0    # Degrees to rotate to face North
+
+# Degrees images need to rotate counterclockwise to face North
+PLAYER_SHIP_ROTATION = 0
 
 # Player laser filename (one string)
 PLAYER_LASER = "media/kenney_nl/spaceshooter/PNG/Lasers/laserBlue01.png"
-# In case image needs unique scaling
 PLAYER_LASER_SCALE = IMAGE_SCALE
-PLAYER_LASER_ROTATION = 0    # Degrees to rotate to face North
 
+# Degrees images need to rotate counterclockwise to face North
+PLAYER_LASER_ROTATION = 0
 
 # Enemy Ship filenames (2 filename strings: one for each of levels 2 and 3)
 ENEMY_SHIPS = ("media/kenney_nl/spaceshooter/PNG/Enemies/enemyRed1.png",
                "media/kenney_nl/spaceshooter/PNG/Enemies/enemyRed2.png")
 ENEMY_SHIP_SCALE = IMAGE_SCALE
-ENEMY_SHIP_ROTATION = 90    # Degrees to rotate to face East
+
+# Degrees to rotate counterclockwise to face East
+ENEMY_SHIP_ROTATION = 90
 
 # Used in main() to get variations on base filename using iteration
 # For example, "spaceshooter/PNG/Meteors/meteorBrown_big3.png"
 # NOTE: main expects 4 files named big 1-4, 2 files names med, 2 named small,
 # and 2 named tiny
+# If make changes to this, must also change main
 ASTEROID_FILENAME_BASE = ("media/kenney_nl/spaceshooter/PNG/"
                           "Meteors/meteorBrown_{}.png")
 ASTEROID_SCALE = 1
@@ -129,19 +178,25 @@ ASTEROID_SCALE = 1
 # Enemy laser filename (one string)
 ENEMY_LASER = "media/kenney_nl/spaceshooter/PNG/Lasers/laserRed01.png"
 ENEMY_LASER_SCALE = IMAGE_SCALE
-ENEMY_LASER_ROTATION = -90    # Degrees to rotate to face East
+
+# Degrees to rotate counterclockwise to face East
+ENEMY_LASER_ROTATION = -90
 
 # Explosion textures are stored in a grid in a spritesheet
+# As long as this is replaced with another spritesheet grid, main doesn't need
+# to be adjusted
 EXPLOSION_FILE = {"filename": "media/explosion.png", "texture_width": 256,
                   "texture_height": 256, "columns": 16,
                   "num_textures": 221}
 EXPLOSION_SCALE = 1
+
+# If the spritesheet has many textures, you may only want to include a
+# fraction of them to speed up animation
 # Since the file has so many textures, only include one out of every two
 # for a shorter animation
 EXPLOSION_SKIP_RATE = 2
 
-
-# TODO: ASK -- better as a dictionary?
+# Sound files
 BACKGROUND_SOUND = "media/imovie_sound_effect_space_log.wav"
 PLAYER_LASER_SOUND = "media/kenney_nl/sounds/laser2.wav"
 ENEMY_LASER_SOUND = "media/kenney_nl/sounds/laser1.mp3"
@@ -154,24 +209,54 @@ WIN_SOUND = "media/imovie_sound_effects_broadcast_news_short.wav"
 
 class Player(arcade.Sprite):
     """
-    Player sprite inherits from arcade.Sprite to represent the player on in
-    the game. Makes use of arcade.Sprite attributes and methods to update
-    (move or change) the player's sprite in response to player input and
-    interactions with other sprites.
+    Player sprite inherits from arcade.Sprite to represent the player
+    onscreen. Makes use of arcade.Sprite attributes and methods, and
+    ability to be placed in an arcade.SpriteList to update (move or change)
+    the sprite's position in response to player input and interactions with
+    other sprites, check collisions with other sprites, draw the sprite on
+    the screen, etc.
 
-    ATTRIBUTES used (see arcade.Sprite for other, unused attributes):
-    :speed:
-    :angle_rate:
-    :forward_rate:
-    :angle:
-    :center_x:
-    :center_y:
-    :change_x:
-    :change_y:
-    :change_angle:
-    :width:
-
-    METHODS used (see arcade.Sprite for other, unused methods):
+    Attributes:
+    (These are the attributes that I create or inherit and use for Player.
+    For other arcade.Sprite attributes that Player doesn't use, see
+    arcade.Sprite.)
+        :angle: (numeric) Angle of the sprite (0 is North).
+        :angle_rate: (numeric) Degrees the sprite can turn per second.
+        :center_x: (numeric) x-coordinate of the sprite's center point on the
+            screen.
+        :center_y: (numeric) y-coordinate of the sprite's center point on the
+            screen.
+        :change_angle: (numeric) Number of degrees and direction (positive is
+            counterclockwise) to change sprite's angle in on_update().
+            Set equal to 0, angle_rate or -angle_rate.
+        :change_x: (numeric) Number of pixels and direction (positive is
+            right) to change sprite's center_x in on_update().
+        :change_y: (numeric) Number of pixels and direction (positive is
+            up) to change sprite's center_y in on_update().
+        :diagonal_size: (numeric) Diagonal measurement of sprite in pixels.
+        :forward_rate: (numeric) Like angle_rate; number of pixels to move
+            sprite forward per second.
+        :image_rotation: (numeric) Degrees that the original sprite image
+            needs to be rotated to face North.
+        :laser_fade_rate: (numeric) amount to subtract from laser's alpha
+            (making it transparent) on each update after 60. 255 makes it
+            instantly disappear; 0 makes it never disappear.
+        :laser_filename: (str) Image filename for laser sprite.
+        :laser_list: (arcade.SpriteList) SpriteList to which to add lasers.
+            Passed by reference so can be shared between objects if needed.
+        :laser_rotation: (numeric) Degrees that the original laser image
+            needs to be rotated to face North.
+        :laser_scale: (numeric) Size of the laser relative to source image.
+        :laser_sound: (arcade.Sound) Sound to play when laser is instantiated.
+        :laser_speed: (numeric) Pixels per second to move laser forward.
+        :reload_ticks: (int) Updates until next laser will shoot.
+        :reload_time: (int) Number of updates between lasers shot if player
+            is continuously trying to shoot (holding down trigger).
+        :shooting: (bool) Whether player is trying to shoot.
+        :speed: (numeric) Pixels per second to move sprite forward in
+            on_update. Set equal to 0, forward_rate or -forward_rate.
+        :window_width: (numeric) Width of window running game.
+        :window_height: (numeric) Height of window running game.
     """
 
     def __init__(self, image_filename: str, scale: Union[int, float],
@@ -182,9 +267,24 @@ class Player(arcade.Sprite):
                  laser_fade_rate: Union[int, float] = 15,
                  laser_sound: Optional[arcade.Sound] = None):
         """
-        Constructor. Sets attributes self.speed, self.angle_rate and
-        self.forward_rate. Uses arcade.Sprite default settings for other
-        attributes, including self.angle.
+        Constructor.
+
+        :param str image_filename: Filename of sprite's source image.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param numeric image_rotation: Degrees that the original image needs
+            to be rotated to face North.
+        :param str laser_filename: Image filename for laser sprite.
+        :param numeric laser_scale: Size of the laser relative to source.
+        :param numeric laser_rotation: Degrees that the original laser image
+            needs to be rotated to face North.
+        :param arcade.SpriteList laser_list: SpriteList to which to add
+            lasers.
+        :param Tuple[int, int] window_dims: Dimensions of window.
+        :param numeric laser_fade_rate: amount to subtract from laser's
+            alpha (making it transparent) on each update after 60. 255 makes
+            it instantly disappear; 0 makes it never disappear.
+        :param arcade.Sound laser_sound: Sound to play when laser is
+            instantiated.
         """
 
         # Validate parameters
@@ -219,6 +319,8 @@ class Player(arcade.Sprite):
                                  " positive")
         if not isinstance(laser_fade_rate, (int, float)):
             raise TypeError("TypeError: laser_fade_rate must be numeric")
+
+        # Don't raise an error too large/small fade rates, just correct them
         if laser_fade_rate < 0:
             laser_fade_rate = 0
         if laser_fade_rate > 255:
@@ -226,19 +328,15 @@ class Player(arcade.Sprite):
         if laser_sound and not isinstance(laser_sound, arcade.Sound):
             raise TypeError("TypeError: laser_sound must be an arcade.Sound")
 
+        # Call super to create sprite object
         super().__init__(filename=image_filename, scale=scale)
 
         # Degrees the image needs to be rotated to face North
         self.image_rotation = image_rotation
 
-        # Set the sprite's initial angle to face North
-        self.angle = image_rotation
-
-        # Set starting speed
-        self.speed = 0
-
-        # No need to set self.angle since arcade.Sprite initializes it to 0
-        # Angle is in degrees; angle 0 == North
+        # Need to know diagonal size to completely hide sprite offscreen at
+        # at any angle
+        self.diagonal_size = (self.width ** 2 + self.height ** 2) ** .5
 
         # Rates per second, not per update (approx rates of 5 per update)
         # Attributes, not global constants, so they can be updated with level
@@ -246,12 +344,28 @@ class Player(arcade.Sprite):
         self.angle_rate = 360
         self.forward_rate = 360
 
-        # Need to know diagonal size to completely hide sprite offscreen at
-        # at any angle
-        self.diagonal_size = (self.width ** 2 + self.height ** 2) ** .5
+        # Set the sprite's initial angle to face North
+        self.angle = image_rotation
 
-        # Laser settings
+        # Set starting speed
+        self.speed = 0
+
+        # The GameView's laser list, passed by reference so the Player sprite
+        # can add to it, and the GameView's main logic can manipulate them
+        # Learned from arcade example: sprite_bullets_periodic.py,
+        # accessible in the downloaded arcade package or online at
+        # (https://api.arcade.academy/en/latest/examples/
+        # sprite_bullets_periodic.html#sprite-bullets-periodic
         self.laser_list = laser_list
+
+        # Laser image data
+        self.laser_filename = laser_filename
+        self.laser_scale = laser_scale
+        self.laser_rotation = laser_rotation - self.image_rotation
+
+        # Laser movement data
+        self.laser_fade_rate = laser_fade_rate
+        self.laser_speed = 400
 
         # How long in updates/frames (1/60 sec) it takes player's lasers to
         # reload and shoot again if player holds down the trigger
@@ -259,35 +373,23 @@ class Player(arcade.Sprite):
         # repeatedly hitting space, but fast enough to be fun
         self.reload_time = 10
 
-        # Counter counting number of frames since last shot
-        self.reload_ticks = 10
-        self.laser_filename = laser_filename
-        self.laser_scale = laser_scale
-        self.laser_rotation = laser_rotation - self.image_rotation
-
-        self.laser_fade_rate = laser_fade_rate
-
-        self.laser_speed = 400
+        # Counter counting down frames since last shot
+        self.reload_ticks = self.reload_time
 
         # If the player is trying to shoot now
         self.shooting = False
 
+        self.laser_sound = laser_sound
+
+        # Window dimensions
         self.window_width = window_dims[0]
         self.window_height = window_dims[1]
 
-        self.laser_sound = laser_sound
-
     def on_update(self, delta_time: float = 1 / 60) -> None:
         """
-        Updates sprite's position by changing angle, center_x and center_y
-        to animate sprite. Should be called at least 30 times per second.
-        Uses delta_time as a factor in setting new position and angle to
-        smooth movement in case of a delay in the frequency of calls to
-        on_update. Otherwise, a call to on_update with delta_time of .5
-        seconds would move the sprite the same amount as a call with
-        delta_time of .01.
-        :param delta_time: time since last call
-        :return: None
+        Updates the sprite's location and angle, and shoots lasers.
+        :param float delta_time:  Time since last update.
+        :return:
         """
 
         # Validate parameters
@@ -303,6 +405,17 @@ class Player(arcade.Sprite):
         self.shoot_lasers()
 
     def turn_and_move(self, delta_time: float = 1 / 60) -> None:
+        """
+        Updates sprite's position by changing angle, center_x and center_y
+        to animate sprite. Should be called at least 30 times per second.
+        Uses delta_time as a factor in setting new position and angle to
+        smooth movement in case of a delay in the frequency of calls to
+        on_update. Otherwise, a call to on_update with delta_time of .5
+        seconds would move the sprite the same amount as a call with
+        delta_time of .01.
+        :param float delta_time: Time since last update.
+        :return:
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -310,26 +423,41 @@ class Player(arcade.Sprite):
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
-        # Update angle player is facing
+        # Update angle sprite is facing (turn sprite)
         # Multiply by delta_time for smooth movement
         self.angle += self.change_angle * delta_time
 
         # Find change_x and change_y based on new angle (essentially a target
-        # point). Default angle is North, so target point on unit circle
-        # x-coordinate (change_x) is negative sin (not positive cos) and
-        # y-coordinate (change_y) is cos (not sin)
+        # point along the direction now facing; how much to move along x- and
+        # y-axes relative to each other to move along line sprite is facing).
+        # Default angle is North, so target point on unit circle x-coordinate
+        # (change_x) is negative sin (not positive cos) and y-coordinate
+        # (change_y) is cos (not sin).
+        # Learned from arcade example code sprite_move_angle.py, lines
+        # 45-46, accessible in the downloaded arcade package or online at
+        # (https://api.arcade.academy/en/latest/examples/
+        # sprite_move_angle.html#sprite-move-angle)
         self.change_x = -math.sin(math.radians(
             self.angle - self.image_rotation))
         self.change_y = math.cos(math.radians(
             self.angle - self.image_rotation))
 
-        # Move sprite in direction it's facing, as determined above
+        # Move sprite in direction it's facing, as determined above.
+        # Multiply by delta_time for smooth movement, so if an update is
+        # delayed, the movement speed across the screen doesn't change
+        # speed * delta time gives smooth speed, and change_x and change_y
+        # determine angle of movement.
+        # Learned from AtiByte's YouTube video, "Python Arcade Library p04
+        # - on_update and the delta time," available at
+        # (https://www.youtube.com/
+        # watch?v=68NnL5NJ7zY&list=PL1P11yPQAo7pPlDlFEaL3IUbcWnnPcALI&index=5)
         self.center_x += self.change_x * self.speed * delta_time
         self.center_y += self.change_y * self.speed * delta_time
 
-        # Let sprite go offscreen so player feels like they can get lost,
-        # but keep sprite from going far so player can bring it back onto
-        # screen immediately
+        # Let sprite go just far enough offscreen that sprite is hidden at
+        # any angle (thus measuring with diagonal_size) so player feels like
+        # they can get lost, but keep sprite from going far so player can
+        # bring it back onto screen immediately.
         if self.center_x < -1 * self.diagonal_size / 2:
             self.center_x = -1 * self.diagonal_size / 2
         if self.center_x > self.window_width + self.diagonal_size / 2:
@@ -340,8 +468,26 @@ class Player(arcade.Sprite):
             self.center_y = self.window_height + self.diagonal_size / 2
 
     def shoot_lasers(self) -> None:
-        # Shoot lasers
-        if self.shooting and self.reload_ticks <= 0:
+        """
+        Shoot lasers if player is trying to shoot. If the player tries to
+        shoot continuously (ie holding down the trigger), only shoots
+        shoots periodically after reload time. If player releases trigger
+        to shoot repeatedly, but not constantly, shoots has quickly as player
+        can hit the trigger.
+        :return: None
+        """
+
+        # Reload immediately if player isn't holding trigger
+        if not self.shooting:
+            self.reload_ticks = 0
+
+        # If player is holding trigger, pause before shooting again
+        elif self.shooting and self.reload_ticks <= 0:
+
+            # Create laser object and add it to laser_list
+            # Laser's initial position and angle are the same as Player's
+            # current position and angle. Find Laser's absolute angle based
+            # on Player's angle and laser_rotation.
             self.laser_list.append(Laser(self.center_x, self.center_y,
                                          self.laser_filename, self.laser_scale,
                                          angle=(self.angle
@@ -349,11 +495,20 @@ class Player(arcade.Sprite):
                                          speed=self.laser_speed,
                                          fade_rate=self.laser_fade_rate,
                                          sound=self.laser_sound))
+
+            # Reset reload time after shooting
             self.reload_ticks = self.reload_time
+
+        # If player is holding down trigger and reload_time updates haven't
+        # elapsed, count down another tick.
         else:
             self.reload_ticks -= 1
 
     def __str__(self) -> str:
+        """
+        Returns string representation of Player object.
+        :return (str): String representation of Player object.
+        """
         return ("<Player: center_x = {}, center_y = {}, speed = {}, "
                 "angle = {}, change_x = {}, change_y = {}>".format(
                     self.center_x, self.center_y, self.speed, self.angle,
@@ -410,7 +565,7 @@ class Laser(arcade.Sprite):
         # How quickly the laser should disappear
         self.fade_rate = fade_rate
 
-        # Optionally play sound (if one is sent)
+        # If there is a sound, play it once when laser is created
         self.sound = sound
         self.player = None
         if self.sound:
@@ -437,10 +592,16 @@ class Laser(arcade.Sprite):
 
         # Fade player_lasers out after firing
         if self.frames > 60:
+
+            # alpha can't be less than 0
             try:
                 self.alpha -= self.fade_rate
+
+            # Remove sprites once their alpha is less than 0
             except ValueError:
                 self.remove_from_sprite_lists()
+
+        # Start fading more slowly than eventual fade rate
         elif self.frames > 50:
             try:
                 self.alpha -= self.fade_rate // 3
@@ -574,22 +735,28 @@ class TargetingSprite(arcade.Sprite):
         if screen_height <= 0:
             raise ValueError("ValueError: screen_height must be positive")
 
+        # Convert measurements to ints to use in random.randrange
+        screen_width = math.ceil(screen_width)
+        screen_height = math.ceil(screen_height)
+        sprite_diagonal = math.ceil(self.diagonal)
+
         # Get coordinates of random point offscreen by getting a random
         # x and a corresponding y that makes it work
 
         # x can be anywhere in the width of the screen, and a little to
         # the left or right
+        # Use integer division because randrange only takes ints
         x = random.randrange(screen_width // -2, 3 * screen_height // 2)
 
         # If x coordinate is within range of visible x's, place
         # y-coordinate offscreen
-        if -self.diagonal // 2 <= x <= screen_width + self.diagonal // 2:
+        if -sprite_diagonal // 2 <= x <= screen_width + sprite_diagonal // 2:
 
             # Whether y will be above or below screen
             y_sign = random.choice([1, -1])
 
             # How far away from edge of screen y will be
-            y_offset = random.randrange(self.diagonal, 5 * self.diagonal)
+            y_offset = random.randrange(sprite_diagonal, 5 * sprite_diagonal)
 
             # Place y above or below edge of screen
             if y_sign > 0:
@@ -600,8 +767,8 @@ class TargetingSprite(arcade.Sprite):
         # If x-coordinate is offscreen, place y-coordinate within,
         # range of visible y-coordinates, or a little beyond
         else:
-            y = random.randrange(-self.diagonal,
-                                 screen_height + self.diagonal)
+            y = random.randrange(-sprite_diagonal,
+                                 screen_height + sprite_diagonal)
 
         return x, y
 
@@ -613,8 +780,12 @@ class TargetingSprite(arcade.Sprite):
         sprite won't be visible.
         """
 
+        # Get random int tuple representing offscreen point
+        # Don't need to validate parameters here because
+        # get_random_offscreen_point validates exactly as this would
         point = self.get_random_offscreen_point(screen_width, screen_height)
 
+        # Set sprite's center coordinates to match point
         self.center_x = point[0]
         self.center_y = point[1]
 
@@ -719,6 +890,7 @@ class TargetingSprite(arcade.Sprite):
         # this should
         point = self.get_random_offscreen_point(screen_width, screen_height)
 
+        # Set sprite's target point
         self.target_x = point[0]
         self.target_y = point[1]
 
@@ -743,17 +915,22 @@ class TargetingSprite(arcade.Sprite):
         if screen_height <= 0:
             raise ValueError("ValueError: screen_height must be positive")
 
+        # Convert measurements to ints to use in random.randrange
+        screen_width = math.ceil(screen_width)
+        screen_height = math.ceil(screen_height)
+        sprite_diagonal = math.ceil(self.diagonal)
+
         if self.center_x < 0:
-            self.target_x = screen_width + self.diagonal
+            self.target_x = screen_width + sprite_diagonal
         elif self.center_x > screen_width:
-            self.target_x = -self.diagonal
+            self.target_x = -sprite_diagonal
         else:
             self.target_x = random.randrange(screen_width)
 
         if self.center_y < 0:
-            self.target_y = screen_height + self.diagonal
+            self.target_y = screen_height + sprite_diagonal
         elif self.center_y > screen_height:
-            self.target_y = -self.diagonal
+            self.target_y = -sprite_diagonal
         else:
             self.target_y = random.randrange(screen_height)
 
@@ -836,6 +1013,8 @@ class EnemyShip(TargetingSprite):
                             "arcade.SpriteList")
         if not isinstance(laser_speed, int):
             raise TypeError("TypeError: laser_speed must be an int")
+        if laser_speed < 0:
+            raise ValueError("ValueError: laser_speed must be non-negative")
         if not isinstance(laser_fade_rate, (int, float)):
             raise TypeError("TypeError: laser_fade_rate must be numeric")
         # TODO: ASK -- things like this are also checked in laser. is it okay
@@ -947,7 +1126,7 @@ class Explosion(arcade.Sprite):
         self.cur_texture_index = 0
         self.texture = self.textures[self.cur_texture_index]
 
-        # Optionally play sound (if one is sent)
+        # If there is a sound, play it once, at the start
         self.sound = sound
         self.player = None
         if self.sound:
@@ -960,6 +1139,7 @@ class Explosion(arcade.Sprite):
         Animate explosion.
         """
         # Animate explosion
+        # Make sure index is within range before indexing into the list
         if self.cur_texture_index < len(self.textures):
             self.texture = self.textures[self.cur_texture_index]
             self.cur_texture_index += 1
@@ -1181,36 +1361,17 @@ class GameView(arcade.View):
 
         super().__init__()
 
-        arcade.set_background_color((0, 0, 0))
+        # General game attributes that don't change
 
         # Window dimensions
         self.width = self.window.width
         self.height = self.window.height
 
-        # Used for indexing, so start at zero
-        self.level = 0
+        # Background color
+        arcade.set_background_color((0, 0, 0))
 
-        # Start with 0 points
-        self.points = 0
+        # Images - Store all sprite image, scale and rotation data
 
-        # Lives
-        self.lives = 2
-
-        # Number of points player earns for each type of hit
-        self.asteroid_points = 5
-        self.enemy_points = 15
-
-        # Whether the player is leveling up or dying. Allows for slight delay
-        # in changing screen so last explosions can play out
-        self.leveling_up = False
-        self.dying = False
-        self.switch_delay = 0    # Number of updates to delay switch
-
-        # Exception will be thrown if there's an attempt to update this
-        # before setup() is called. That is intentional
-        self.updates_this_level = None
-
-        # Store all sprite image and scale data
         # Pre-loaded list of arcade.Textures for explosion sprite
         self.explosion_textures = explosion_textures[0]
         self.explosion_image_scale = explosion_textures[1]
@@ -1264,12 +1425,14 @@ class GameView(arcade.View):
         self.game_over_sound = arcade.load_sound(game_over_sound)
         self.game_over_player = None
 
-        # Key press info
-        self.left_pressed = False
-        self.right_pressed = False
-        self.up_pressed = False
-        self.down_pressed = False
-        self.space_pressed = False
+        # Game settings
+
+        # Number of points player earns for each type of hit
+        self.asteroid_points = 5
+        self.enemy_points = 15
+
+        # Highest level in the game (start counting at level 1, not 0)
+        self.level_limit = 3
 
         # TODO: ASK
         #  - should be tuple of dictionaries or dictionary of tuples (current)?
@@ -1277,7 +1440,7 @@ class GameView(arcade.View):
         #  the level so less work has to be done checking level updates vs
         #  spawn rate, etc?
 
-        # Game level settings store specific settings (which ship image to
+        # Level settings store specific settings (which ship image to
         # use, how many asteroids or enemies to have, etc.)
         # These can be easily changed to alter level feel or difficulty
         self.level_settings = {
@@ -1299,15 +1462,63 @@ class GameView(arcade.View):
             'asteroid spawn rate': (1, 0, 1),
             'asteroid speed range': ((50, 200), (50, 200), (100, 200))}
 
+        # Confirm that there are settings for every level
+        # self.level (below, starts at 0) is used to index into each tuple
+        # in the level_settings dict, so verify that it won't try to index
+        # out of bounds. self.level won't be incremented to reach
+        # self.level_limit
+        for key in self.level_settings:
+            if len(self.level_settings[key]) < self.level_limit:
+                raise ValueError("ValueError: level_settings must have {}"
+                                 " elements for {}".format(self.level_limit,
+                                                           key))
+
+        # Attributes that change dynamically during play
+
+        # Start with 0 points
+        self.points = 0
+
+        # Lives - counts down to zero (for a total of three)
+        self.lives = 2
+
+        # Whether the player is leveling up or dying. Allows for slight delay
+        # in changing screen so last explosions can play out
+        self.leveling_up = False
+        self.dying = False
+
+        # Counts updates after leveling_up or dying is made True to facilitate
+        # slight delay before switching levels or dying
+        self.switch_delay = 0
+
+        # Which keys are pressed/held down at any given time
+        self.left_pressed = False
+        self.right_pressed = False
+        self.up_pressed = False
+        self.down_pressed = False
+        self.space_pressed = False
+
+        # Attributes that change based on the level and are reset at each
+        # restarted level
+
+        # Number of updates
+        self.updates_this_level = 0
+
+        # Used for indexing into level settings, so start at zero
+        self.level = 0
+
+        # These all get assigned non-None values by the setup() function
+        # when an object is created, or the player starts/restarts a level
+
+        # For counting down updates until the next asteroid or enemy is
+        # spawned
         self.asteroids_spawning = None
         self.enemies_spawning = None
 
-        # These are set up later in setup() because they're reset at each
-        # death or new level
         # Player sprite
         self.player_sprite = None
 
-        # Sprite lists for each group of sprites
+        # Sprite lists for each group of sprites to efficiently call the
+        # same methods or do the same things to each set
 
         # Even though there's only one player, having having a list to add
         # that sprite to gives more flexibility with later code
@@ -1340,6 +1551,9 @@ class GameView(arcade.View):
         self.dying = False
         self.switch_delay = 0
 
+        # If playing the lost life or level-up sound, stop it
+        # Don't have to check that the sound exists because the only way the
+        # player can exist is if the sound does
         if self.lost_life_player and not self.lost_life_sound.is_playing(
                 self.lost_life_player):
             self.lost_life_player = None
@@ -1353,15 +1567,19 @@ class GameView(arcade.View):
                     self.background_music_player)):
             self.background_music_sound.stop(self.background_music_player)
 
-        self.background_music_player = self.background_music_sound.play(
-            loop=True)
+        # Although background_music_sound isn't an optional parameter, code
+        # defensively in case a later iteration of the program makes it
+        # optional
+        if self.background_music_sound:
+            self.background_music_player = self.background_music_sound.play(
+                loop=True)
 
         # Set number of updates before new asteroid or enemy is spawned
         # 60 updates per second
-        if self.level_settings['starting asteroids'][self.level] > 0:
+        if self.level_settings['asteroid spawn rate'][self.level] > 0:
             self.asteroids_spawning = 60 // self.level_settings[
                 'asteroid spawn rate'][self.level]
-        if self.level_settings['starting enemies'][self.level] > 0:
+        if self.level_settings['enemy spawn rate'][self.level] > 0:
             self.enemies_spawning = 60 // self.level_settings[
                 'enemy spawn rate'][self.level]
 
@@ -1447,6 +1665,8 @@ class GameView(arcade.View):
                                     " be integers")
 
         for i in range(num_asteroids):
+            # Class init method makes sure there's at least one file in
+            # self.asteroid_filenames
             asteroid = Asteroid(random.choice(self.asteroid_filenames),
                                 self.asteroid_image_scale)
 
@@ -1500,18 +1720,18 @@ class GameView(arcade.View):
 
             enemy.set_speed_in_range(speed_range)
 
+            # Lasers should always be faster than ships, and anything slower
+            # than 50 just looks too slow
             enemy.laser_speed = max(3 * enemy.speed, 50)
 
             self.enemy_list.append(enemy)
 
-    # TODO: ASK I THINK these and other window methods return None since I
-    #  don't return anything, but there's some weird stuff going on with
-    #  these inherited methods, like how on_update gets called with
-    #  delta_time
     def on_draw(self) -> None:
 
         # This clears the screen for the following drawings to work
         arcade.start_render()
+
+        # utilize arcade.SpriteList draw() method to efficiently draw sprites
 
         # Drawing with SpriteList means anything outside the viewport won't
         # be drawn
@@ -1527,6 +1747,14 @@ class GameView(arcade.View):
         self.enemy_list.draw()
 
         # Draw player in front of enemies, asteroids and lasers
+        # If I were to draw the sprite directly, not using the list, it would
+        # be drawn as long as self.player_sprite wasn't None, so I'd have to
+        # set self.player_sprite to None when the player died, but trying
+        # to call the draw() method on None would raise an error, so I'd
+        # first have to check that self.player_sprite wasn't None. Drawing
+        # with the list avoids all of that since, if there's a sprite in the
+        # list, it gets drawn, and if there's no sprite in the list (after the
+        # player dies), nothing gets drawn.
         self.player_list.draw()
 
         # Draw explosions in front of all other sprites
@@ -1581,15 +1809,18 @@ class GameView(arcade.View):
         self.update_points_based_on_strikes()
 
         # player-dictated actions
-        self.update_player_sprite_based_on_input()
+        self.update_player_speed_angle_change_based_on_input()
 
-        # Refill obstacles
-        self.refill_asteroids_and_enemies()
+        # Spawn new asteroids and enemies
+        self.spawn_asteroids_and_enemies()
 
         # Set targets for enemy sprites
         self.set_targets_for_enemies()
 
         # Update all sprite lists
+        # an arcade.SpriteList object has a list attribute that holds all the
+        # sprites in the SpriteList. on_update() iterates through the list,
+        # calling the on_update() method of each sprite
         self.player_list.on_update(delta_time)
         self.player_laser_list.on_update(delta_time)
         self.asteroid_list.on_update(delta_time)
@@ -1600,7 +1831,11 @@ class GameView(arcade.View):
     def update_level_based_on_points(self) -> None:
         # If points goal reached for this level, jump to the next one
         if self.points >= self.level_settings['points goal'][self.level]:
-            if self.level <= 1:
+
+            # level is used to index into level_settings tuples, but
+            # level_limit is the minimum length of those tuples, so level
+            # must always be at least one less than level_settings
+            if self.level < self.level_limit - 1:
                 # If hasn't played sound and there is sound to play
                 if not self.level_up_player and self.level_up_sound:
                     self.level_up_player = self.level_up_sound.play()
@@ -1613,7 +1848,6 @@ class GameView(arcade.View):
                     self.leveling_up = True
                     self.switch_delay += 1
             else:
-                # TODO DEFENSIVE CODING FOR ALL SOUNDS
                 # Since background_music_player is None unless sound has been
                 # played, if it is True, then background_music_player is True
                 if (self.background_music_player
@@ -1635,13 +1869,24 @@ class GameView(arcade.View):
                     self.switch_delay += 1
 
     def update_lives_based_on_hits(self) -> None:
-        # If the player collides with any other sprite, they die
-        # Use sprite list to check instead of self.player_sprite so that
-        # collisions don't get checked if player dies and is removed from list
 
+        # If the player hasn't already been hit and is dying, check if they've
+        # been hit this time
         if not self.dying:
+
+            # List of total hits from each iteration of the loop below
+            # Not necessary with one player sprite, but will be if using
+            # multiple player sprites
             hits = []
+
+            # If the player collides with any other sprite, they die
+            # Like with draw() method, use sprite list to check instead of
+            # self.player_sprite so that collisions don't get checked if
+            # player dies and is removed from list
             for player in self.player_list:
+
+                # arcade function that checks for collisions between a Sprite
+                # and a list of SpriteLists
                 h = arcade.check_for_collision_with_lists(
                     player, [self.asteroid_list, self.enemy_laser_list,
                              self.enemy_list])
@@ -1660,27 +1905,36 @@ class GameView(arcade.View):
 
                 self.dying = True
 
+        # If the player is dying, including from a hit on this update
         if self.dying:
+
             # If lives left, restart level
             if self.lives >= 1:
-                # If hasn't played sound
+
+                # If there is a sound, but it hasn't been played, play it
                 if not self.lost_life_player and self.lost_life_sound:
                     self.lost_life_player = self.lost_life_sound.play()
 
                 # Slightly delay reset of level so last explosions can
                 # play out
                 if self.switch_delay == 60:
+
                     # Decrement lives left
                     self.lives -= 1
+
+                    # Restart this level
                     self.setup()
+
                 else:
                     self.dying = True
                     self.switch_delay += 1
 
             # If out of lives go to ending screen
             else:
+
                 # Since background_music_player is None unless sound has been
-                # played, if it is True, then background_music_player is True
+                # played, if it is True, then background_music_sound must
+                # exist, so it can be stopped
                 if (self.background_music_player
                         and self.background_music_sound.is_playing(
                             self.background_music_player)):
@@ -1694,9 +1948,11 @@ class GameView(arcade.View):
                 # Slightly delay switch to game over view so last explosions
                 # can play out at this level
                 if self.switch_delay == 60:
+
                     # Go to game over screen
                     game_lost_view = GameLostView()
                     self.window.show_view(game_lost_view)
+
                 else:
                     self.dying = True
                     self.switch_delay += 1
@@ -1710,8 +1966,8 @@ class GameView(arcade.View):
         # There's not a method to check for collisions between one SpriteList
         # and one or more others, so must iterate over player_laser_list
 
-        # Iterate backwards over list of lasers to avoid IndexErrors as lasers
-        # are removed
+        # Iterate backwards over list of lasers to avoid IndexErrors as
+        # sprites are removed
         for i in range(len(self.player_laser_list) - 1, -1, -1):
 
             # Get asteroids this laser has collided with
@@ -1740,16 +1996,18 @@ class GameView(arcade.View):
         self.remove_and_explode(asteroids_hit)
         self.remove_and_explode(enemies_hit)
 
-    def remove_and_explode(self, sprite_list: List[arcade.Sprite]):
+    # Didn't want to call the list of sprites sprite_list because it
+    # could be confused with a SpriteList
+    def remove_and_explode(self, list_o_sprites: List[arcade.Sprite]):
         """
         Removes all sprites from list, leaving explosions where they were.
         """
 
         # Validate parameters
-        if not isinstance(sprite_list, list):
+        if not isinstance(list_o_sprites, list):
             raise TypeError("TypeError: sprite_list must be a list")
 
-        for sprite in sprite_list:
+        for sprite in list_o_sprites:
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  sprite.center_x,
                                                  sprite.center_y,
@@ -1757,7 +2015,7 @@ class GameView(arcade.View):
                                                  self.explosion_sound))
             sprite.remove_from_sprite_lists()
 
-    def update_player_sprite_based_on_input(self) -> None:
+    def update_player_speed_angle_change_based_on_input(self) -> None:
         # Update player change_movement based on key presses
         # Default to no movement if keys aren't pressed
         self.player_sprite.change_angle = 0
@@ -1787,13 +2045,13 @@ class GameView(arcade.View):
     # by reference, so so much extra code would have to be written to support
     # that generic refilling function that the result would be longer and
     # less clear than this method.
-    def refill_asteroids_and_enemies(self) -> None:
+    def spawn_asteroids_and_enemies(self) -> None:
         """
-        Refill asteroids and enemies to starting number for level. Spawn
-        replacements at the speed of their spawn rate.
+        Spawn new asteroids and enemies at the intervals indicated by their
+        spawn rates.
         """
-        # If there are asteroids on level, refill to starting num on interval
-        if self.level_settings['starting asteroids'][self.level] > 0:
+        # If there asteroids spawn on level, add another num on interval
+        if self.level_settings['asteroid spawn rate'][self.level] > 0:
             if self.asteroids_spawning > 0:
                 self.asteroids_spawning -= 1
             else:
@@ -1803,8 +2061,8 @@ class GameView(arcade.View):
                 self.asteroids_spawning = 60 // self.level_settings[
                     'asteroid spawn rate'][self.level]
 
-        # If there are enemies on level, refill to starting num on interval
-        if self.level_settings['starting enemies'][self.level] > 0:
+        # If enemies spawn on this level, add new one on interval
+        if self.level_settings['enemy spawn rate'][self.level] > 0:
             if self.enemies_spawning > 0:
                 self.enemies_spawning -= 1
             else:
@@ -1830,7 +2088,7 @@ class GameView(arcade.View):
                 enemy.reload_time = None
                 # Pause before retreating.
                 # Only visible if this delay is less than the time to restart
-                # the level.
+                # the level (right now they're equal).
                 # I don't want it visible now, but I want the ability to make
                 # it visible in the future.
                 if self.switch_delay > 60:
@@ -1839,7 +2097,6 @@ class GameView(arcade.View):
                     elif enemy.speed > -100:
                         enemy.speed *= 1.2
 
-    # TODO: ASK Not sure about return values....I don't call this function
     def on_key_press(self, symbol: int, modifiers: int) -> None:
 
         # Validate parameters
@@ -1853,7 +2110,7 @@ class GameView(arcade.View):
                                        or modifiers == arcade.key.MOD_CTRL):
             arcade.close_window()
 
-        # Restart program
+        # Restart game
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
             self.points = 0
@@ -1863,9 +2120,18 @@ class GameView(arcade.View):
         # Pause game
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
+
+            # Pass this view to pause view so play can restart from the same
+            # place when the game is un-paused
             pause = PauseView(self)
             self.window.show_view(pause)
 
+        # Key presses to translate into player movement and shooting in
+        # update_player_speed_angle_change_based_on_input()
+        # Learned this from AtiByte's video, "Python Arcade Library p05, -
+        # keyboard input and smooth movement," accessible at
+        # (https://www.youtube.com/
+        # watch?v=em6WphBQbh0&list=PL1P11yPQAo7pPlDlFEaL3IUbcWnnPcALI&index=6)
         if symbol == arcade.key.RIGHT:
             self.right_pressed = True
         if symbol == arcade.key.LEFT:
@@ -1874,11 +2140,10 @@ class GameView(arcade.View):
             self.up_pressed = True
         if symbol == arcade.key.DOWN:
             self.down_pressed = True
-
         if symbol == arcade.key.SPACE:
             self.space_pressed = True
 
-        # For "cheating," jumping to a different level with full lives and
+        # For "cheating," jumping to levels 1, 2 or 3 with full lives and
         # necessary points
         if symbol == arcade.key.KEY_1 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 0
@@ -1899,7 +2164,8 @@ class GameView(arcade.View):
             self.setup()
 
         # Super cheat for getting to level three with only a few more points
-        # needed to win
+        # needed to win (to be able to demo win screen during presentation
+        # since I die a lot while playing)
         if symbol == arcade.key.KEY_4 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 2
             self.lives = 2
@@ -1914,6 +2180,8 @@ class GameView(arcade.View):
         if not isinstance(modifiers, int):
             raise TypeError("TypeError: modifiers must be an integer")
 
+        # Key releases to translate into (lack of) player movement and
+        # shooting in update_player_speed_angle_change_based_on_input()
         if symbol == arcade.key.RIGHT:
             self.right_pressed = False
         if symbol == arcade.key.LEFT:
@@ -1922,7 +2190,6 @@ class GameView(arcade.View):
             self.up_pressed = False
         if symbol == arcade.key.DOWN:
             self.down_pressed = False
-
         if symbol == arcade.key.SPACE:
             self.space_pressed = False
 
@@ -1963,6 +2230,10 @@ class FadingView(arcade.View):
         self.fade_rate = fade_rate
 
     def fade_in(self) -> bool:
+
+        # Since alpha is an attribute I created, it's okay for self.alpha to
+        # rise above 255 as long as it's corrected down before it's used to
+        # draw, since the draw() methods require an alpha <= 255
         self.alpha += self.fade_rate
         if self.alpha >= 255:
             self.alpha = 255
@@ -1971,6 +2242,9 @@ class FadingView(arcade.View):
             return False
 
     def fade_out(self) -> bool:
+
+        # It's okay for self.alpha to dip below 0 as long as it's corrected
+        # before it's used to draw
         self.alpha -= self.fade_rate
         if self.alpha <= 0:
             self.alpha = 0
@@ -1987,16 +2261,10 @@ class FadingView(arcade.View):
 
 
 class TitleView(FadingView):
-    def __init__(self, game_view: GameView):
-
-        if not isinstance(game_view, GameView):
-            raise TypeError("game_view must be an instance of GameView")
-
+    def __init__(self):
         super().__init__(5, 0)
 
         arcade.set_background_color((0, 0, 0))
-
-        self.game_view = game_view
 
         self.title_text = "Spin\n&\nShoot"
 
@@ -2018,7 +2286,7 @@ class TitleView(FadingView):
             raise ValueError("ValueError: delta_time must be non-negative")
 
         if self.faded_out:
-            instructions = InstructionsView(self.game_view)
+            instructions = InstructionsView()
             self.window.show_view(instructions)
         if not self.faded_in:
             self.faded_in = self.fade_in()
@@ -2030,6 +2298,10 @@ class TitleView(FadingView):
     def on_draw(self) -> None:
         arcade.start_render()
 
+        # Draw a rectangle with different colors fading in from each corner
+        # Learned from arcade example gradients.py, accessible in the
+        # downloaded arcade package or online at (https://api.arcade.academy/
+        # en/latest/examples/gradients.html#gradients)
         black = (0, 0, 0, self.alpha)
         blue = (0, 0, 205, self.alpha)
         self.bg_colors = (black, black, black, blue)
@@ -2041,7 +2313,11 @@ class TitleView(FadingView):
         arcade.draw_text(self.title_text, self.window.width / 2,
                          self.window.height / 2, (255, 255, 255, self.alpha),
                          anchor_x="center", anchor_y="center",
-                         font_size=80, align="center", bold=True,
+
+                         # Scale font size with window height (less worried
+                         # about window width since text wraps)
+                         font_size=self.window.height / 10,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -2054,7 +2330,11 @@ class TitleView(FadingView):
 
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-            self.window.show_view(self.game_view)
+
+            # The asterisk unpacks the tuple so it's like I'm passing it 14
+            # different arguments
+            game = GameView(*self.window.game_parameters)
+            self.window.show_view(game)
 
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
@@ -2070,16 +2350,10 @@ class TitleView(FadingView):
 
 
 class InstructionsView(FadingView):
-    def __init__(self, game_view: GameView):
-
-        if not isinstance(game_view, GameView):
-            raise TypeError("game_view must be an instance of GameView")
-
+    def __init__(self):
         super().__init__(5, 0)
 
         arcade.set_background_color((0, 0, 0))
-
-        self.game_view = game_view
 
         self.title_text = ("INSTRUCTIONS:"
                            "\n\n\nShoot the asteroids and enemies without"
@@ -2126,7 +2400,10 @@ class InstructionsView(FadingView):
         arcade.draw_text(self.title_text, self.window.width / 2,
                          self.window.height / 2, (255, 255, 255, self.alpha),
                          anchor_x="center", anchor_y="center",
-                         font_size=20, align="center", bold=True,
+
+                         # Scale font size with window height
+                         font_size=self.window.height / 40,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -2138,20 +2415,22 @@ class InstructionsView(FadingView):
             raise TypeError("TypeError: modifiers must be an integer")
 
         if symbol == arcade.key.SPACE:
-            self.window.show_view(self.game_view)
+            game = GameView(*self.window.game_parameters)
+            self.window.show_view(game)
 
-        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            self.window.show_view(self.game_view)
+        elif symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                         or modifiers == arcade.key.MOD_CTRL):
+            game = GameView(*self.window.game_parameters)
+            self.window.show_view(game)
 
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
             arcade.close_window()
 
     def __str__(self) -> str:
-        return ("<InstructionsView: faded_in = {}, alpha = {}, fade_rate = {}"
-                " game_view = {}>".format(self.faded_in, self.alpha,
-                                          self.fade_rate, self.game_view))
+        return ("<InstructionsView: faded_in = {}, alpha = {}, "
+                "fade_rate = {}>".format(self.faded_in, self.alpha,
+                                         self.fade_rate))
 
 
 class GameLostView(arcade.View):
@@ -2184,12 +2463,14 @@ class GameLostView(arcade.View):
         arcade.draw_text(self.game_over_text, self.window.width / 2,
                          self.window.height / 2, (255, 255, 255),
                          anchor_x="center", anchor_y="bottom",
-                         font_size=60, align="center", bold=True,
+                         font_size=self.window.height / 12,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
         arcade.draw_text(self.instruction_text, self.window.width / 2,
                          self.window.width / 4, (255, 255, 255),
                          anchor_x="center", anchor_y="baseline",
-                         font_size=20, align="center", bold=True,
+                         font_size=self.window.height / 40,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -2261,12 +2542,14 @@ class GameWonView(arcade.View):
         arcade.draw_text(self.game_won_text, self.window.width / 2,
                          self.window.height / 2, (255, 255, 255),
                          anchor_x="center", anchor_y="bottom",
-                         font_size=60, align="center", bold=True,
+                         font_size=self.window.height / 12,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
         arcade.draw_text(self.instruction_text, self.window.width / 2,
                          self.window.width / 4, (255, 255, 255),
                          anchor_x="center", anchor_y="baseline",
-                         font_size=20, align="center", bold=True,
+                         font_size=self.window.height / 40,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -2350,12 +2633,14 @@ class PauseView(arcade.View):
         arcade.draw_text(self.pause_text, self.window.width / 2,
                          self.window.height / 2, (255, 255, 255),
                          anchor_x="center", anchor_y="bottom",
-                         font_size=60, align="center", bold=True,
+                         font_size=self.window.height / 12,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
         arcade.draw_text(self.instruction_text, self.window.width / 2,
                          self.window.width / 4, (255, 255, 255),
                          anchor_x="center", anchor_y="baseline",
-                         font_size=20, align="center", bold=True,
+                         font_size=self.window.height / 40,
+                         align="center", bold=True,
                          width=self.window.width, multiline=True)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
@@ -2380,7 +2665,7 @@ class PauseView(arcade.View):
 
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-            # If music, restart it
+            # If there's music playing, restart it at the same point
             if (self.game_view.background_music_sound
                     and self.game_view.background_music_player):
                 self.game_view.background_music_player = \
@@ -2522,15 +2807,10 @@ def main():
                        ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
                        LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
 
-    # The asterisk unpacks the tuple so it's like I'm passing it 14 arguments
-    game_view = GameView(*game_parameters)
-    game_view.setup()
-    # TODO IS THIS OKAY PRACTICE OR DO I NEED TO PASS IT AS A PARAM FROM ONE
-    #  TO THE NEXT?
     # Store game_parameters as Window attribute so all view objects can access
     window.game_parameters = game_parameters
     # Start with title view, which calls the next view, which calls the next...
-    title_view = TitleView(game_view)
+    title_view = TitleView()
     window.show_view(title_view)
     arcade.run()
 
