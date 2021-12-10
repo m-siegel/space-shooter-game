@@ -209,7 +209,7 @@ WIN_SOUND = "media/imovie_sound_effects_broadcast_news_short.wav"
 
 class Player(arcade.Sprite):
     """
-    Player sprite inherits from arcade.Sprite to represent the player
+    Player inherits from arcade.Sprite to represent the player
     onscreen. Makes use of arcade.Sprite attributes and methods, and
     ability to be placed in an arcade.SpriteList to update (move or change)
     the sprite's position in response to player input and interactions with
@@ -272,7 +272,7 @@ class Player(arcade.Sprite):
         :param str image_filename: Filename of sprite's source image.
         :param numeric scale: Size of the sprite relative to source image.
         :param numeric image_rotation: Degrees that the original image needs
-            to be rotated to face North.
+            to be rotated counterclockwise to face North.
         :param str laser_filename: Image filename for laser sprite.
         :param numeric laser_scale: Size of the laser relative to source.
         :param numeric laser_rotation: Degrees that the original laser image
@@ -389,7 +389,7 @@ class Player(arcade.Sprite):
         """
         Updates the sprite's location and angle, and shoots lasers.
         :param float delta_time:  Time since last update.
-        :return:
+        :return: None
         """
 
         # Validate parameters
@@ -414,7 +414,7 @@ class Player(arcade.Sprite):
         seconds would move the sprite the same amount as a call with
         delta_time of .01.
         :param float delta_time: Time since last update.
-        :return:
+        :return: None
         """
 
         # Validate parameters
@@ -507,7 +507,7 @@ class Player(arcade.Sprite):
     def __str__(self) -> str:
         """
         Returns string representation of Player object.
-        :return (str): String representation of Player object.
+        :return str: String representation of Player object.
         """
         return ("<Player: center_x = {}, center_y = {}, speed = {}, "
                 "angle = {}, change_x = {}, change_y = {}>".format(
@@ -516,11 +516,52 @@ class Player(arcade.Sprite):
 
 
 class Laser(arcade.Sprite):
+    """
+    Laser inherits from arcade.Sprite to represent lasers onscreen. Lasers
+    are instantiated a a given location and angle, and move forward from their
+    starting position. Depending upon its fade_rate, a laser may fade and
+    disappear at different rates.
+
+    Attributes:
+        :alpha: (numeric) Transparency of the sprite. 255 is completely
+            visible, 0 is invisible
+        :center_x: (numeric) x-coordinate of the sprite's center point on the
+            screen.
+        :center_y: (numeric) y-coordinate of the sprite's center point on the
+            screen.
+        :change_x: (numeric) Number of pixels and direction (positive is
+            right) to change sprite's center_x in on_update().
+        :change_y: (numeric) Number of pixels and direction (positive is
+            up) to change sprite's center_y in on_update().
+        :fade_rate: (numeric) amount to subtract from sprite's alpha
+            (making it transparent) on each update after 60. 255 makes it
+            instantly disappear; 0 makes it never disappear.
+        :frames: (int) Number of updates since sprite's initialization.
+        :player: (pyglet.media.player.Player) Sound player for playing sound.
+        :sound: (arcade.Sound) Sound to play when laser is instantiated.
+        :speed: (numeric) Pixels per second to move sprite forward in
+            on_update. Set equal to 0, forward_rate or -forward_rate.
+    """
+
     def __init__(self,  x: Union[int, float], y: Union[int, float],
                  image_filename: str, scale: Union[int, float],
                  angle: Union[int, float] = 0, speed: Union[int, float] = 200,
                  fade_rate: Union[int, float] = 0,
                  sound: Optional[arcade.Sound] = None):
+        """
+        Constructor.
+
+        :param numeric x: X-coordinate of sprite's starting center point.
+        :param numeric y: Y-coordinate of sprite's starting center point.
+        :param str image_filename: Filename of sprite's source image.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param numeric angle: Sprite's angle.
+        :param numeric speed: Sprite's movement speed in pixels per second.
+        :param numeric fade_rate: Amount to subtract from sprite's alpha
+            (making it transparent) on each update after 60. 255 makes it
+            instantly disappear; 0 makes it never disappear.
+        :param arcade.Sound sound: Sound to play when laser is instantiated.
+        """
 
         # Validate parameters
         if not isinstance(x, (int, float)):
@@ -546,18 +587,17 @@ class Laser(arcade.Sprite):
         if sound and not isinstance(sound, arcade.Sound):
             raise TypeError("TypeError: sound must be an arcade.Sound")
 
+        # Call super to create sprite at given location, angle and scale.
         super().__init__(filename=image_filename, scale=scale, center_x=x,
                          center_y=y, angle=angle, )
 
+        # Sprite's movement speed
         self.speed = speed
 
-        # Set direction angle
+        # Set movement angle based on angle sprite's facing.
+        # self.angle is initialized in super's __init__()
         self.change_x = -math.sin(math.radians(self.angle))
         self.change_y = math.cos(math.radians(self.angle))
-
-        # Bullets start invisible until spawned
-        # redundant if not drawing spawning bullets in separate list
-        self.visible = True
 
         # Frames since initialization
         self.frames = 0
@@ -572,6 +612,11 @@ class Laser(arcade.Sprite):
             self.player = sound.play()
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+        """
+        Updates the sprite's location.
+        :param float delta_time:  Time since last update.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -579,14 +624,15 @@ class Laser(arcade.Sprite):
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
-        # used to track when to spawn laser and when it should die
+        # Increment count of updates/frames since Laser was instantiated
         self.frames += 1
+
         # Always move in the same direction at the same rate
         self.center_x += self.change_x * self.speed * delta_time
         self.center_y += self.change_y * self.speed * delta_time
 
         # Remove very faint lasers
-        # (feels weird to destroy an obstacle with invisible laser)
+        # (feels weird to destroy an obstacle with almost invisible laser)
         if self.alpha <= 20:
             self.remove_from_sprite_lists()
 
@@ -601,7 +647,7 @@ class Laser(arcade.Sprite):
             except ValueError:
                 self.remove_from_sprite_lists()
 
-        # Start fading more slowly than eventual fade rate
+        # Start fading more slowly than eventual fade rate 10 updates before
         elif self.frames > 50:
             try:
                 self.alpha -= self.fade_rate // 3
@@ -609,6 +655,10 @@ class Laser(arcade.Sprite):
                 self.remove_from_sprite_lists()
 
     def __str__(self) -> str:
+        """
+        Returns string representation of Player object.
+        :return str: String representation of Player object.
+        """
         return ("<Laser: center_x = {}, center_y = {}, speed = {}, "
                 "change_x = {}, change_y = {}, fade_rate = {}>".format(
                     self.center_x, self.center_y, self.speed, self.change_x,
@@ -616,9 +666,72 @@ class Laser(arcade.Sprite):
 
 
 class TargetingSprite(arcade.Sprite):
+    """
+    Inherits from arcade.Sprite. Generic class for representing non-player
+    sprites onscreen, giving them directed motion. Facilitates randomization
+    of starting locations, speed, target, etc. to give variety to a group of
+    TargetingSprites. Superclass for Asteroid and EnemyShip classes.
+
+    A TargetingSprite has a target point that it always moves toward. This
+    point may be updated to make the sprite follow the player, the mouse, or
+    any another sprite, or it may stay the same to have the sprite move in
+    a single direction.
+
+    To facilitate variety in TargetingSprites instantiated en masse, the class
+    allows for specific or random values to be set for location, speed, etc.
+    TargetingSprites may be given specific initial locations, or they may be
+    given random offscreen locations using set_random_offscreen_location().
+    They may be given specific targets, or random targets offscreen.
+    Offscreen targets may be entirely random, set with set_target() and
+    get_random_offscreen_point(), or, if the sprite is currently offscreen,
+    a target point may be randomly chosen such that the sprite will have to
+    visibly cross the screen to reach it (set_random_cross_screen_target()).
+    Sprites may be given exact speeds or spins, or random ones within a given
+    range.
+
+    This class does not change the sprite's angle to face the target point.
+    That's intentional because it allows subclasses to add that capability if
+    they need it, but doesn't force it on subclasses that don't want it.
+
+    Attributes:
+        :angle: (numeric) Angle of the sprite (0 is East).
+        :center_x: (numeric) x-coordinate of the sprite's center point on the
+            screen.
+        :center_y: (numeric) y-coordinate of the sprite's center point on the
+            screen.
+        :change_angle: (numeric) Number of degrees and direction (positive is
+            counterclockwise) to change sprite's angle in on_update().
+        :change_x: (numeric) Number of pixels and direction (positive is
+            right) to change sprite's center_x in on_update().
+        :change_y: (numeric) Number of pixels and direction (positive is
+            up) to change sprite's center_y in on_update().
+        :diagonal: (numeric) Diagonal measurement of sprite in pixels.
+        :image_rotation: (numeric) Degrees that the original sprite image
+            needs to be rotated to face East.
+        :speed: (numeric) Pixels per second to move sprite forward in
+            on_update. Set equal to 0, forward_rate or -forward_rate.
+        :target_x: (numeric) X-coordinate of target point.
+        :target_y: (numeric) Y-coordinate of target point.
+    """
+
     def __init__(self, image_filename: str, scale: Union[int, float],
                  file_rotation: int = 0,  target_x: Union[int, float] = 0,
                  target_y: Union[int, float] = 0):
+        """
+        Constructor. Creates object and sets target.
+
+        Sprite's location defaults to (0, 0), which is the bottom left corner
+        in an Arcade window. To have the sprite appear at any other location,
+        set the location after instantiating the sprite, either by explicitly
+        setting center_x and center_y or with set_random_offscreen_location().
+
+        :param str image_filename: Filename of sprite's source image.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param numeric file_rotation: Degrees that the original image needs
+            to be rotated counterclockwise to face East.
+        :param numeric target_x: X-coordinate of target point.
+        :param numeric target_y: Y-coordinate of target point.
+        """
 
         # Validate parameters
         if not isinstance(image_filename, str):
@@ -634,18 +747,22 @@ class TargetingSprite(arcade.Sprite):
         if not isinstance(target_y, (int, float)):
             raise TypeError("TypeError: target_y must be a numeric type")
 
+        # Super's __init__() creates a sprite whose center is at (0, 0)
+        # I don't change that because where subclasses may want their sprites
+        # to always appear at a different point, or to appear at random
+        # points. Since there's no one location that's better to set than
+        # (0, 0), I just keep the super's default.
         super().__init__(filename=image_filename, scale=scale)
 
-        # Initialize speed to not moving
-        self.speed = 0
+        # Since the superclass has attributes center_x, change_x, etc., and
+        # I don't want to assign values to them other than the defaults, I
+        # don't initialize them again here.
 
-        # Initialize target point to center of screen
+        # Initialize speed and target point. These are easily changed after
+        # instantiation, but need to be created here in order to exist.
+        self.speed = 0
         self.target_x = target_x
         self.target_y = target_y
-
-        # I'll be using attributes change_x and change_y to indicate how much
-        # sprite should move along each direction with each update.
-        # arcade.Sprite has those attributes, so I don't initialise them here
 
         # In case image source needs to be rotated to face right way
         self.image_rotation = file_rotation
@@ -655,6 +772,15 @@ class TargetingSprite(arcade.Sprite):
         self.diagonal = int((self.width ** 2 + self.height ** 2) ** .5)
 
     def on_update(self, delta_time: float = 1 / 60) -> float:
+        """
+        Move sprite towards target point at rate of self.speed per second.
+        Returns angle from sprite's current point to target point. Angle is
+        measured in radians, counterclockwise from East.
+
+        :param float delta_time: Time since last update.
+        :return float angle_rad: Angle in radians from sprite's location to
+            target point. Measured counterclockwise from East.
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -669,30 +795,37 @@ class TargetingSprite(arcade.Sprite):
         # Only move if not already at target point
         if x_distance != 0 or y_distance != 0:
 
+            # Degree from sprite's center to target, in radians.
             # Angle between -pi and pi, formed by pos x axis and vector to
             # target. Handles situations that would raise ZeroDivisionError
             # with math.tan
             angle_rad = math.atan2(y_distance, x_distance)
 
+            # Since angle's initial side is pos x axis, use normal trig
+            # functions to find changes in x and y per unit of 1
+            # Note: math trig functions need angles in radians
+            self.change_x = math.cos(angle_rad)
+            self.change_y = math.sin(angle_rad)
+
             # Arcade's sprite has methods to do something similar to this
             # (getting the change in x and y from the angle and updating
             # sprite's position), but it doesn't factor in delta_time
 
-            # Since angle's initial side is pos x axis, use normal trig
-            # functions to find changes in x and y per unit of 1
-            self.change_x = math.cos(angle_rad)
-            self.change_y = math.sin(angle_rad)
-
-            # Find changes in x and y in terms of speed and delta time
+            # Factor in rate per second (speed * delta_time) to changes in
+            # x and y
             self.change_x *= self.speed * delta_time
             self.change_y *= self.speed * delta_time
 
-        # If at target point, just return current angle
+        # If at target point, don't move, but get current angle in radians
+        # to return.
         else:
+
+            # Undo image_rotation to calculate absolute angle from East
+            # since math.atan2() calculated and without image rotation
             angle_rad = math.radians(self.angle - self.image_rotation)
 
-        # Set new center_x
         # Move to target if within range, otherwise move towards target
+        # Set new center_x
         if abs(x_distance) <= self.change_x:
             self.center_x = self.target_x
         else:
@@ -709,12 +842,21 @@ class TargetingSprite(arcade.Sprite):
         return angle_rad
 
     def set_target(self, x: Union[int, float], y: Union[int, float]) -> None:
+        """
+        Set target coordinates for sprite.
 
+        :param numeric x: X-coordinate of target point.
+        :param numeric y: Y-coordinate of target point.
+        :return: None
+        """
+
+        # Validate parameters
         if not isinstance(x, (int, float)):
             raise TypeError("TypeError: x must be a numeric type")
         if not isinstance(y, (int, float)):
             raise TypeError("TypeError: y must be a numeric type")
 
+        # Set target
         self.target_x = x
         self.target_y = y
 
@@ -722,9 +864,17 @@ class TargetingSprite(arcade.Sprite):
                                    screen_height: Union[
                                        int, float]) -> Tuple[int, int]:
         """
-        Returns the coordinates of a random point offscreen. Point is not
-        far offscreen, but far enough to hid sprite.
+        Returns the coordinates of a pseudorandom point offscreen. Point is
+        not far offscreen, but far enough to hide sprite at any angle.
+
+        Currently used by set_random_offscreen_location(), and by
+        set_random_offscreen_target() but can easily be used by other methods.
+
+        :param numeric screen_width: Width of arcade.Window displaying sprite.
+        :param numeric screen_height: Height of arcade.Window.
+        :return Tuple[int, int]: Coordinates of offscreen point (x, y).
         """
+
         # Validate parameters
         if not isinstance(screen_width, (int, float)):
             raise TypeError("TypeError: screen_width must be a numeric type")
@@ -736,6 +886,7 @@ class TargetingSprite(arcade.Sprite):
             raise ValueError("ValueError: screen_height must be positive")
 
         # Convert measurements to ints to use in random.randrange
+        # Always round up to be sure sprite can be invisible at return point
         screen_width = math.ceil(screen_width)
         screen_height = math.ceil(screen_height)
         sprite_diagonal = math.ceil(self.diagonal)
@@ -743,20 +894,22 @@ class TargetingSprite(arcade.Sprite):
         # Get coordinates of random point offscreen by getting a random
         # x and a corresponding y that makes it work
 
-        # x can be anywhere in the width of the screen, and a little to
-        # the left or right
+        # x can be anywhere in the range from one half of the screen width
+        # to the left of the screen to one half of the screen width to the
+        # right
         # Use integer division because randrange only takes ints
         x = random.randrange(screen_width // -2, 3 * screen_height // 2)
 
-        # If x coordinate is within range of visible x's, place
-        # y-coordinate offscreen
+        # If x coordinate is within range of visible x's (ie anywhere within
+        # the screen's width or half a diagonal measurement of the sprite
+        # beyond the screen), place y-coordinate offscreen
         if -sprite_diagonal // 2 <= x <= screen_width + sprite_diagonal // 2:
-
-            # Whether y will be above or below screen
-            y_sign = random.choice([1, -1])
 
             # How far away from edge of screen y will be
             y_offset = random.randrange(sprite_diagonal, 5 * sprite_diagonal)
+
+            # Whether y will be above or below screen
+            y_sign = random.choice([1, -1])
 
             # Place y above or below edge of screen
             if y_sign > 0:
@@ -778,6 +931,10 @@ class TargetingSprite(arcade.Sprite):
         """
         Sets sprite's location to random point offscreen point such that
         sprite won't be visible.
+
+        :param numeric screen_width: Width of arcade.Window displaying sprite.
+        :param numeric screen_height: Height of arcade.Window.
+        :return: None
         """
 
         # Get random int tuple representing offscreen point
@@ -793,16 +950,21 @@ class TargetingSprite(arcade.Sprite):
     def get_random_in_range(num_range: Union[int, Tuple[int], Tuple[int, int],
                                              Tuple[int, int, int]]) -> int:
         """
-        Returns a random number within the given range. The range is slightly
-        more flexible than the Python range() function, but its elements serve
-        the same purpose: (start, stop, step). If only start is given, if start
-        and stop are equal, or if the step is 0, then the return value will be
-        equal start. Otherwise, it will return a random number within the given
-        range. Ranges like (5, -3, 2), which are invalid for other range
+        Returns a random number within the given range. This range is more
+        flexible than the Python range() function, but its elements serve the
+        same purpose: (start, stop, step). If only start is given, if start
+        and stop are equal, or if the step is 0, then the return value will
+        be equal start. Otherwise, it will return a random number within the
+        given range. Ranges like (5, -3, 2), which are invalid for other range
         functions, will be rearranged to be valid, for example, (5, -3, 2) -->
-        (5, -3, -2). Note: this method allows for negative return values.
+        (5, -3, -2).
 
-        Used by class for set_speed_in_range() and set_random_spin().
+        Used by class for set_speed_in_range() and set_random_spin(), but
+        can be used by other methods in this class, or other classes and
+        functions as well.
+
+        :param int or int tuple num_range: Range of integers to choose from.
+        :return int: Pseudorandom integer.
         """
 
         # Validate parameters
@@ -819,8 +981,8 @@ class TargetingSprite(arcade.Sprite):
                                     "be integers")
 
         # If num_range isn't really a range because it's only one number or
-        # because the start and end of the range are the same, set speed to
-        # that number
+        # because the start and end of the range are the same, return that
+        # number
         if isinstance(num_range, int):
             return num_range
         if len(num_range) == 1 or num_range[0] == num_range[1]:
@@ -832,8 +994,8 @@ class TargetingSprite(arcade.Sprite):
         else:
             step = num_range[2]
 
-            # If step is zero, then num_range can't be traversed, so make
-            # speed first number in range
+            # If step is zero, then num_range can't be traversed, so return
+            # the first number in the range
             if step == 0:
                 return num_range[0]
 
@@ -841,25 +1003,31 @@ class TargetingSprite(arcade.Sprite):
         # traversed using the step size. Can only get from smaller number to
         # bigger number with positive steps, or from bigger to smaller using
         # negative steps. If the sign of the step doesn't match the given
-        # range, change the sign of the step
+        # range, change the sign of the step to make the range traversable
         if not ((num_range[0] < num_range[1] and step > 0)
                 or num_range[0] > num_range[1] and step < 0):
             step *= -1
 
+        # Return random number in range
         return random.randrange(num_range[0], num_range[1], step)
 
     def set_speed_in_range(self,
                            speed_range: Union[int, Tuple[int], Tuple[int, int],
                                               Tuple[int, int, int]]) -> None:
         """
-        Sets the sprites speed to a number within the given range.
+        Sets the sprites speed to a random number within the given range.
         Note: this method allows for negative speeds. That's intentional
         since later extensions may want the ability to move away from targets.
+
+        :param int or int tuple speed_range: Range of integer speeds to
+            choose from.
+        :return: None
         """
 
         # Don't validate parameters here because validation is done in
         # get_random_in_range, which raises and handles the same errors this
-        # should
+        # would
+        # Set speed to random number speed_range
         self.speed = self.get_random_in_range(speed_range)
 
     # Though this is currently only used by asteroid, not enemy, it could be
@@ -871,23 +1039,30 @@ class TargetingSprite(arcade.Sprite):
                             Tuple[int, int, int]] = (-5, 6, 2)) -> None:
         """
         Sets the sprite's change_angle to a number within the given range.
+
+        :param int or int tuple speed_range: Range of integer speeds to
+            choose from.
+        :return: None
         """
 
         # Don't validate parameters here because validation is done in
         # get_random_in_range, which raises and handles the same errors this
         # should
+        # Set change_angle to random integer within speed_range
         self.change_angle = self.get_random_in_range(speed_range)
 
     def set_random_offscreen_target(self, screen_width: Union[int, float],
                                     screen_height: Union[int, float]) -> None:
         """
-        Sets sprite's target to random point offscreen point such that
-        sprite won't be visible once it reaches that point
+        Sets sprite's target to random point offscreen such that sprite won't
+        be visible once it reaches that point.
+
+        :param numeric screen_width: Width of arcade.Window displaying sprite.
+        :param numeric screen_height: Height of arcade.Window.
+        :return: None
         """
 
-        # Don't validate parameters here because validation is done in
-        # get_random_offscreen_point, which raises and handles the same errors
-        # this should
+        # Get random offscreen point
         point = self.get_random_offscreen_point(screen_width, screen_height)
 
         # Set sprite's target point
@@ -900,9 +1075,17 @@ class TargetingSprite(arcade.Sprite):
                                        screen_height: Union[
                                            int, float]) -> None:
         """
-        Set sprite's target to random point across the screen. "Across the
-        screen" means that the sprite will have to cross some part of the
-        screen in order to reach the target.
+        If the sprite's current location is offscreen, sets the sprite's
+        target to random point across the screen. "Across the screen" means
+        that the sprite will have to cross part of the screen in order to
+        reach the target. Useful for making sure movement by sprites from
+        one offscreen point to another is visible to the player on the screen.
+        If the sprite is currently onscreen, then the target will be set to
+        a random point onscreen.
+
+        :param numeric screen_width: Width of arcade.Window displaying sprite.
+        :param numeric screen_height: Height of arcade.Window.
+        :return: None
         """
 
         # Validate parameters
@@ -920,21 +1103,45 @@ class TargetingSprite(arcade.Sprite):
         screen_height = math.ceil(screen_height)
         sprite_diagonal = math.ceil(self.diagonal)
 
+        # If the sprite's current x is on one side or the other of the screen,
+        # set its target x to be on the other side. That way, when it moves
+        # to the target, the sprite will have to cross from one side of the
+        # screen to the other.
         if self.center_x < 0:
             self.target_x = screen_width + sprite_diagonal
         elif self.center_x > screen_width:
             self.target_x = -sprite_diagonal
+
+        # If the current x is within the screen's width, set its target x
+        # to be within the screen's width, too. Since the sprite's current
+        # location should be offscreen, then the current y coordinate must
+        # be above or below the screen and the target y will be set so the
+        # sprite has to cross from top to bottom or bottom to top. In order
+        # to make that movement visible onscreen, the x-coordinate has to
+        # be set to a value within the width of the screen. Otherwise, a
+        # a sprite could move from top to bottom, to the side of the screen
+        # and never become visible.
         else:
             self.target_x = random.randrange(screen_width)
 
+        # If the sprite's center y value is offscreen, set its target value
+        # offscreen on the other side so it must cross.
         if self.center_y < 0:
             self.target_y = screen_height + sprite_diagonal
         elif self.center_y > screen_height:
             self.target_y = -sprite_diagonal
+
+        # If the y value is currently visible within the screen height, then
+        # make the target also within the screen's height so the sprite will
+        # appear on the screen as it crosses from left to right.
         else:
             self.target_y = random.randrange(screen_height)
 
     def __str__(self) -> str:
+        """
+        Returns string representation of TargetingSprite object.
+        :return str: String representation of TargetingSprite object.
+        """
         return ("<TargetingSprite: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
                 " change_y = {}>".format(self.center_x, self.center_y,
