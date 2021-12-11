@@ -550,6 +550,8 @@ class Laser(arcade.Sprite):
                  sound: Optional[arcade.Sound] = None):
         """
         Constructor.
+        Creates instance of Laser at given point, facing given direction
+        and starts playing sound. Sets sprite's speed and fade_rate.
 
         :param numeric x: X-coordinate of sprite's starting center point.
         :param numeric y: Y-coordinate of sprite's starting center point.
@@ -1419,12 +1421,13 @@ class EnemyShip(TargetingSprite):
         # shoot towards target
         self.laser_speed = max(3 * self.speed, 50)
 
-        # Ships shouldn't be able to shoot the moment they're created
-        self.reload_time = self.laser_speed
+        # Ships should be able to shoot the moment they're created
+        self.reload_time = 0
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
         """
         Updates the sprite's location and angle, and shoots lasers.
+
         :param float delta_time:  Time since last update.
         :return: None
         """
@@ -1467,6 +1470,7 @@ class EnemyShip(TargetingSprite):
     def __str__(self) -> str:
         """
         Returns string representation of EnemyShip object.
+
         :return str: String representation of EnemyShip object.
         """
         return ("<EnemyShip: center_x = {}, center_y = {}, speed = {}, "
@@ -1479,13 +1483,49 @@ class EnemyShip(TargetingSprite):
 
 class Explosion(arcade.Sprite):
     """
-    Creates a sprite and animates it once in place with textures, then
-    disappears.
+    Extends arcade.Sprite to represent an animated explosion onscreen.
+    An Explosion sprite has many textures (like frames in an animation),
+    which the sprite swaps through to animate the explosion. The sprite
+    stays in one location and then disappears once the animation is over.
+
+    Utilizes arcade.Sprite's texture and textures attributes for animation.
+
+    Attributes:
+        This isn't a list of all attributes that Explosion has (it has manu
+        inherited ones that aren't used here. These are just the attributes
+        used in this class).
+        :center_x: (numeric) x-coordinate of the Explosion's center point on
+            the screen.
+        :center_y: (numeric) y-coordinate of the Explosion's center point on
+            the screen.
+        :cur_texture_index: (int) Index in the textures list of the Texture
+            currently assigned to self.texture.
+        :scale: (numeric) Size of the explosion onscreen relative to source
+            image.
+        :player: (pyglet.media.player.Player) Sound player for playing sound.
+        :sound: (arcade.Sound) Sound to play when Explosion is instantiated.
+        :texture: (arcade.Texture) Current Texture (image) that's being
+            displayed for the sprite.
+        :textures: (List[arcade.Texture]) List of Textures for sprite.
     """
+
     def __init__(self, textures: List[arcade.Texture],
                  center_x: Union[int, float], center_y: Union[int, float],
                  scale: Union[int, float] = 1,
                  sound: Optional[arcade.Sound] = None):
+        """
+        Constructor.
+        Creates an instance of Explosion at the given location and starts
+        playing the Explosion sound.
+
+        :param List[arcade.Texture] textures: List of Textures (like frames
+            in an animation) for sprite.
+        :param numeric center_x: X-coordinate of sprite's center point.
+        :param numeric center_y: Y-coordinate of sprite's center point.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param arcade.Sound sound: Sound to play when Explosion is
+            instantiated.
+        """
 
         # Validate parameters
         if not isinstance(textures, list):
@@ -1511,35 +1551,49 @@ class Explosion(arcade.Sprite):
         # Initialize from super without images
         super().__init__(center_x=center_x, center_y=center_y, scale=scale)
 
+        # List of Textures (like frames) for animation
         self.textures = textures
 
         # Initialize current texture and texture index
+        # Already confirmed there's at least one Texture in the list, so
+        # won't get IndexErrors indexing into it
         self.cur_texture_index = 0
         self.texture = self.textures[self.cur_texture_index]
 
+        # Set player to None in case there isn't a sound
+        self.player = None
+
         # If there is a sound, play it once, at the start
         self.sound = sound
-        self.player = None
         if self.sound:
             self.player = sound.play()
 
-    # TODO: ASK if a method only has itself as a parameter, do I need to
-    #  validate it?
     def update(self) -> None:
         """
-        Animate explosion.
+        Change current texture to next Texture in textures list. After
+        iterating over the list once, remove the sprite.
+
+        :return: None
         """
+
         # Animate explosion
-        # Make sure index is within range before indexing into the list
+        # Make sure index is within range before indexing into the list.
+        # Change current texture to the next one in the list and increment
+        # index counter.
         if self.cur_texture_index < len(self.textures):
             self.texture = self.textures[self.cur_texture_index]
             self.cur_texture_index += 1
 
-        # Remove from lists
+        # If finished iterating over list, remove sprite from SpriteLists.
         else:
             self.remove_from_sprite_lists()
 
     def __str__(self) -> str:
+        """
+        Returns string representation of Explosion object.
+
+        :return str: String representation of Explosion object.
+        """
         return ("<Explosion: center_x = {}, center_y = {},"
                 "number of textures = {}>".format(self.center_x, self.center_y,
                                                   len(self.textures)))
@@ -1548,12 +1602,139 @@ class Explosion(arcade.Sprite):
 # Main game logic
 class GameView(arcade.View):
     """
+    Represents the game screen in the open window. Contains the primary game
+    logic and controls gameplay. Manages player input (translates key presses
+    into sprite creation and movement). Creates sprites, updates their
+    locations, angles and textures, and checks for collisions and removes
+    destroyed sprites. Manages player lives, points, and leveling up, and
+    calls PauseView, GameLostView and GameWonView as needed. Determines level
+    settings, like the number of enemies that a player faces, their speeds and
+    where they come from.
+
     Extends arcade.View with specifics for how this game runs. Inherits
-    attributes and methods from arcade.Window that make a game possible.
-    For example, as a descendent of an arcade.Window, MyGameWindow's on_draw
-    and on_update methods automatically get called 60 times per second, which
-    enables animation and gameplay.
+    attributes and methods from arcade.View that make a game possible.
+    For example, as a subclass of arcade.View, GameView's on_draw
+    and on_update methods get called 60 times per second without my code
+    explicitly doing so. This enables animation and gameplay. Similarly, the
+    inherited on_key_press and on_key_release methods get called whenever
+    those events occur. Arcade inherits these methods from Pyglet.
+
+    Attributes:
+        These are just the attributes used by GameView. It inherits other
+        attributes from arcade.View that aren't used here. Information about
+        them can be found in the Arcade documentation.
+
+        :asteroid_filenames: (List[str]) Filenames for Asteroid sprites'
+            source images.
+        :asteroid_image_scale: (numeric) Size of Asteroid sprites relative to
+            size of source images.
+        :asteroid_list: (SpriteList) SpriteList of Asteroids.
+        :asteroid_points: (int) Points player gains for each Asteroid hit.
+        :asteroids_spawning: (int) Like switch_delay; number of updates
+            until next Asteroid is spawned (gets decremented then reset).
+        :background_music_player: (pyglet.media.player.Player) Sound player
+            for playing background_music_sound.
+        :background_music_sound: (arcade.Sound) Background sound for game.
+        :down_pressed: (bool) Whether the down arrow key is pressed.
+        :dying: (bool) Whether the player is in the process of dying.
+        :enemy_laser_filename: (str) Filename for EnemyShip sprites' Laser
+            source image.
+        :enemies_spawning: (int) Like switch_delay; number of updates
+            until next EnemyShip is spawned (gets decremented then reset).
+        :enemy_laser_image_rotation: (numeric) Degrees source image needs to
+            rotate clockwise to face East.
+        :enemy_laser_image_scale: (numeric) Size of EnemyShip sprites' Lasers
+            relative to size of source images.
+        :enemy_laser_list: (SpriteList) SpriteList of EnemyShips' Lasers.
+        :enemy_laser_player: (pyglet.media.player.Player) Sound player
+            for playing enemy_laser_sound.
+        :enemy_laser_sound: (arcade.Sound) EnemyShip's Laser firing sound.
+        :enemy_list: (SpriteList) SpriteList of EnemyShips.
+        :enemy_points: (int) Points player gains for each EnemyShip hit.
+        :enemy_ship_filenames: (Tuple[str, str]) Filenames for EnemyShip
+            sprite source images.
+        :enemy_ship_image_rotation: (numeric) Degrees source images need to
+            rotate clockwise to face East.
+        :enemy_ship_image_scale: (numeric) Size of EnemyShip sprite relative to
+            size of source images.
+        :explosion_image_scale: (numeric) Size of Explosion sprite relative to
+            size of source images.
+        :explosion_list: (SpriteList) SpriteList of active Explosions.
+        :explosion_player: (pyglet.media.player.Player) Sound player
+            for playing explosion_sound.
+        :explosion_sound: (arcade.Sound) Sound of Explosions.
+        :explosion_textures: (List[arcade.Texture]) List of textures to
+            animate Explosion sprites.
+        :game_over_player: (pyglet.media.player.Player) Sound player
+            for playing game_over_sound.
+        :game_over_sound: (arcade.Sound) Sound when player loses the game.
+        :height: (numeric) Height of the associated window.
+        :left_pressed: (bool) Whether the left arrow key is pressed.
+        :level: (int) The current level. Used for indexing into the tuples
+            in the level_settings dictionary.
+        :level_limit: (int) Maximum number of levels in the game. Since
+            levels are counted starting at 0, this should be one more than
+            the highest value of self.level. Used to verify that each tuple
+            in level_settings is long enough to be used at each level.
+        :level_up_player: (pyglet.media.player.Player) Sound player
+            for playing level_up_sound.
+        :level_settings: (Dict[Tuple[Union[str, int, float]]]) Dictionary
+            of settings for each level:
+                'points goal' - The number of points needed to beat the level.
+                'player ship' - Which image file to use for the Player sprite.
+                'player laser fade' - How quickly the Player's lasers fade.
+                'enemy ship' - Which image file to use for EnemyShips.
+                'starting enemies' - Number of EnemyShips at the start of the
+                    level.
+                'enemy spawn rate' - How quickly new EnemyShips spawn.
+                'enemy speed range' - Speed range for EnemyShip movement.
+                'enemy laser fade' - How quickly the EnemyShips' lasers fade.
+                'starting asteroids' - Number of Asteroids at the start of the
+                    level.
+                'asteroid spawn rate' - How quickly new Asteroids spawn.
+                'asteroid speed range' - Speed range for EnemyShip movement.
+        :level_up_sound: (arcade.Sound) Sound of player moving to next level.
+        :leveling_up: (bool) Whether the player is in the process of leveling
+            up.
+        :lives: (int) Number of extra lives the player has left.
+        :lost_life_player: (pyglet.media.player.Player) Sound player
+            for playing lost_life_sound.
+        :lost_life_sound: (arcade.Sound) Sound of player losing a life.
+        :player_laser_filename: (str) Filename for Player sprites' Laser
+            source image.
+        :player_laser_image_rotation: (numeric) Degrees source image needs to
+            rotate clockwise to face North.
+        :player_laser_image_scale: (numeric) Size of Player sprites' Laser
+            sprites relative to size of source image.
+        :player_laser_list: (SpriteList) SpriteList of Player's Lasers.
+        :player_laser_player: (pyglet.media.player.Player) Sound player
+            for playing player_laser_sound.
+        :player_laser_sound: (arcade.Sound) Player's Laser firing sound.
+        :player_list: (SpriteList) to hold the Player sprite.
+        :player_ship_filenames: (Tuple[str, str, str]) Filenames for Player
+            sprite source images.
+        :player_ship_image_rotation: (numeric) Degrees source images need to
+            rotate clockwise to face North.
+        :player_ship_image_scale: (numeric) Size of Player sprite relative to
+            size of source images.
+        :player_sprite: (Player) the Player sprite representing the player.
+        :points: (int) Number of total points the player has earned.
+        :right_pressed: (bool) Whether the right arrow key is pressed.
+        :space_pressed: (bool) Whether the space bar is pressed.
+        :switch_delay: (int) Number of updates since leveling_up or dying
+            became True. Used to delay the switch to the next level or
+            to restarting this level (if the player dies) to let sound effects
+            and explosions play out for a smoother-feeling transition.
+        :up_pressed: (bool) Whether the up arrow key is pressed.
+        :updates_this_level: (int) Number of times on_update has been called
+            for the current level.
+        :width: (numeric) Width of the associated window.
+        :win_player: (pyglet.media.player.Player) Sound player
+            for playing win_sound.
+        :win_sound: (arcade.Sound) Sound when player wins the game.
+        :window: (arcade.Window) Window with which this View is associated.
     """
+
     def __init__(self, explosion_textures: Tuple[List[arcade.Texture],
                                                  Union[int, float]],
                  player_ship_image_files: Tuple[Tuple[str, str, str],
@@ -1573,10 +1754,59 @@ class GameView(arcade.View):
                  win_sound: str, game_over_sound: str):
         """
         Constructor.
-        Initializes attributes to None so they're recognized, but calls
-        setup() to set their values so as not to repeat code that needs to
-        exist in a setup method (to be able to reset at game restart).
-        Sets background color, since that only needs to happen once.
+        Sets background color and assigns attributes that don't change, like
+        width, height, level_settings, and all sprite image and sound data.
+        Initializes attributes that change dynamically during play, like
+        points, lives, and up_pressed. Also initializes attributes like
+        updates_this_level and explosion_list that get reset at the beginning
+        of every level. Initializes the SpriteLists to None, then calls
+        setup() to fill them in and fill out the level's components based
+        on the level settings.
+
+        :param tuple explosion_textures: Tuple whole
+            first element is a List of arcade.Textures to animate the
+            Explosion sprites, and whose second element is the scale for those
+            textures.
+        :param tuple player_ship_image_files: Tuple with three elements:
+            1) Three string tuple representing the source files for Player
+                images,
+            2) number representing size of sprite relative to source images,
+            3) number representing counterclockwise degrees to rotate source
+                image to face North.
+        :param tuple player_laser_image_file: Tuple with three elements:
+            1) String representing the source file for Player's Laser image,
+            2) number representing size of sprite relative to source image,
+            3) number representing counterclockwise degrees to rotate source
+                image to face North.
+        :param tuple enemy_ship_image_files: Tuple with three elements:
+            1) Three string tuple representing the source files for
+                EnemyShips' images,
+            2) number representing size of sprite relative to source images,
+            3) number representing counterclockwise degrees to rotate source
+                image to face East.
+        :param tuple enemy_laser_image_file: Tuple with three elements:
+            1) String representing the source file for EnemyShips' Laser image,
+            2) number representing size of sprite relative to source image,
+            3) number representing counterclockwise degrees to rotate source
+                image to face East.
+        :param tuple asteroid_image_files: Tuple with two elements:
+            1) List of strings representing the source files for Asteroids'
+                images,
+            2) number representing size of sprite relative to source images,
+        :param str background_music: Filename of source for background_music
+            sound
+        :param str player_laser_sound: Filename of source for
+            player_laser_sound sound
+        :param str enemy_laser_sound: Filename of source for enemy_laser_sound
+            sound
+        :param str explosion_sound: Filename of source for explosion_sound
+            sound
+        :param str level_up_sound: Filename of source for level_up_sound sound
+        :param str lost_life_sound: Filename of source for lost_life_sound
+            sound
+        :param str win_sound: Filename of source for win_sound sound
+        :param str game_over_sound: Filename of source for game_over_sound
+            sound
         """
 
         # Validate parameters
@@ -1888,14 +2118,14 @@ class GameView(arcade.View):
         self.down_pressed = False
         self.space_pressed = False
 
+        # Used for indexing into level settings, so start at zero
+        self.level = 0
+
         # Attributes that change based on the level and are reset at each
         # restarted level
 
         # Number of updates
         self.updates_this_level = 0
-
-        # Used for indexing into level settings, so start at zero
-        self.level = 0
 
         # These all get assigned non-None values by the setup() function
         # when an object is created, or the player starts/restarts a level
@@ -2349,22 +2579,22 @@ class GameView(arcade.View):
         for i in range(len(self.player_laser_list) - 1, -1, -1):
 
             # Get asteroids this laser has collided with
-            a = arcade.check_for_collision_with_list(self.player_laser_list[i],
-                                                     self.asteroid_list)
+            asteroids = arcade.check_for_collision_with_list(
+                self.player_laser_list[i], self.asteroid_list)
 
             # Get enemies this laser has collided with
-            e = arcade.check_for_collision_with_list(self.player_laser_list[i],
-                                                     self.enemy_list)
+            enemies = arcade.check_for_collision_with_list(
+                self.player_laser_list[i], self.enemy_list)
 
             # Remove laser if it hit anything
-            if a or e:
+            if asteroids or enemies:
                 self.player_laser_list[i].remove_from_sprite_lists()
 
                 # Add these hit asteroids and enemies to lists of all hit
                 # asteroids
                 # and enemies
-                asteroids_hit += a
-                enemies_hit += e
+                asteroids_hit += asteroids
+                enemies_hit += enemies
 
         # Add points for each hit
         self.points += self.asteroid_points * len(asteroids_hit)
