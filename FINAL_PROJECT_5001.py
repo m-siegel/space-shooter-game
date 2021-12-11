@@ -522,7 +522,7 @@ class Laser(arcade.Sprite):
     starting position. Depending upon its fade_rate, a laser may fade and
     disappear at different rates.
 
-    Attributes:
+    Attributes (that are used here):
         :alpha: (numeric) Transparency of the sprite. 255 is completely
             visible, 0 is invisible
         :center_x: (numeric) x-coordinate of the sprite's center point on the
@@ -694,6 +694,8 @@ class TargetingSprite(arcade.Sprite):
     they need it, but doesn't force it on subclasses that don't want it.
 
     Attributes:
+    These are just the ones that TargetingSprite actively uses. It has
+    others that it inherits from arcade.Sprite.
         :angle: (numeric) Angle of the sprite (0 is East).
         :center_x: (numeric) x-coordinate of the sprite's center point on the
             screen.
@@ -1151,7 +1153,52 @@ class TargetingSprite(arcade.Sprite):
 
 
 class Asteroid(TargetingSprite):
-    def __init__(self, image_filename: str, scale: Union[int, float]):
+    """
+    Extends TargetingSprite to represent an asteroid on the screen.
+    Moves across the screen from one offscreen point to another at a random
+    speed and with a random spin. Disappears when it reaches its offscreen
+    target.
+
+    Makes use of many TargetingSprite attributes and methods.
+
+    Attributes:
+    These are just the ones that Asteroid actively uses. It has others
+    that it inherits from TargetingSprite and arcade.Sprite.
+        :angle: (numeric) Angle of the sprite (0 is East).
+        :center_x: (numeric) x-coordinate of the sprite's center point on the
+            screen.
+        :center_y: (numeric) y-coordinate of the sprite's center point on the
+            screen.
+        :change_angle: (numeric) Number of degrees and direction (positive is
+            counterclockwise) to change sprite's angle in on_update().
+        :change_x: (numeric) Number of pixels and direction (positive is
+            right) to change sprite's center_x in on_update().
+        :change_y: (numeric) Number of pixels and direction (positive is
+            up) to change sprite's center_y in on_update().
+        :diagonal: (numeric) Diagonal measurement of sprite in pixels.
+        :speed: (numeric) Pixels per second to move sprite forward in
+            on_update. Set equal to 0, forward_rate or -forward_rate.
+        :target_x: (numeric) X-coordinate of target point.
+        :target_y: (numeric) Y-coordinate of target point.
+    """
+
+    def __init__(self, image_filename: str, scale: Union[int, float],
+                 screen_width: Union[int, float],
+                 screen_height: Union[int, float],
+                 speed_range: Union[int, Tuple[int], Tuple[int, int],
+                                    Tuple[int, int, int]]):
+        """
+        Constructor. Instantiate sprite at random offscreen location and set
+        random cross-screen target. Set random speed in given range and
+        random spin in default range.
+
+        :param str image_filename: Filename of sprite's source image.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param numeric screen_width: Width of arcade.Window displaying sprite.
+        :param numeric screen_height: Height of arcade.Window.
+        :param int or int tuple speed_range: Range for sprite's speed to fall
+            in.
+        """
 
         # Validate parameters
         if not isinstance(image_filename, str):
@@ -1160,10 +1207,37 @@ class Asteroid(TargetingSprite):
             raise TypeError("TypeError: scale must be a numeric type")
         if scale <= 0:
             raise ValueError("ValueError: scale must be positive")
+        if not isinstance(screen_width, (int, float)):
+            raise TypeError("TypeError: screen_width must be a numeric type")
+        if screen_width <= 0:
+            raise ValueError("ValueError: screen_width must be positive")
+        if not isinstance(screen_height, (int, float)):
+            raise TypeError("TypeError: screen_height must be a numeric type")
+        if screen_height <= 0:
+            raise ValueError("ValueError: screen_height must be positive")
+        # Don't validate speed_range because set_speed_in_range() raises and
+        # handles errors in the same way I would here
 
+        # Instantiate TargetingSprite object
         super().__init__(image_filename, scale)
 
+        # Set random offscreen starting location and cross-screen target
+        self.set_random_offscreen_location(screen_width, screen_height)
+        self.set_random_cross_screen_target(screen_width, screen_height)
+
+        # Set random speed and spin
+        self.set_speed_in_range(speed_range)
+        self.set_random_spin()
+
     def on_update(self, delta_time: float = 1 / 60) -> None:
+        """
+        Move sprite towards target point at rate of self.speed pixels per
+        second and spin sprite at rate of change_angle degrees per update
+        (60 * change_angle degrees per second).
+
+        :param float delta_time: Time since last update.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -1171,9 +1245,10 @@ class Asteroid(TargetingSprite):
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
+        # Call super's method to move the sprite towards the target
         super().on_update(delta_time)
 
-        # Spin asteroid
+        # Spin asteroid sprite
         self.angle += self.change_angle
 
         # Eliminate asteroids once they disappear offscreen (reach target)
@@ -1181,6 +1256,10 @@ class Asteroid(TargetingSprite):
             self.remove_from_sprite_lists()
 
     def __str__(self) -> str:
+        """
+        Returns string representation of Asteroid object.
+        :return str: String representation of Asteroid object.
+        """
         return ("<Asteroid: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
                 " change_y = {}>".format(self.center_x, self.center_y,
@@ -1872,21 +1951,13 @@ class GameView(arcade.View):
                                     " be integers")
 
         for i in range(num_asteroids):
-            # Class init method makes sure there's at least one file in
-            # self.asteroid_filenames
-            asteroid = Asteroid(random.choice(self.asteroid_filenames),
-                                self.asteroid_image_scale)
-
-            asteroid.set_random_offscreen_location(self.width, self.height)
-
-            asteroid.set_speed_in_range(speed_range)
-
-            asteroid.set_random_spin()
-
-            # Set random target point for asteroid across screen
-            asteroid.set_random_cross_screen_target(self.width, self.height)
-
-            self.asteroid_list.append(asteroid)
+            # This class init method makes sure there's at least one file in
+            # self.asteroid_filenames. Choose random image to be asteroid in
+            # order to have variety.
+            self.asteroid_list.append(
+                Asteroid(random.choice(self.asteroid_filenames),
+                         self.asteroid_image_scale, self.width, self.height,
+                         speed_range))
 
     def make_enemy_ships(self, num_enemies: int,
                          speed_range: Union[int, Tuple[int], Tuple[int, int],
