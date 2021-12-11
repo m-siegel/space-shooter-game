@@ -1269,13 +1269,89 @@ class Asteroid(TargetingSprite):
 
 
 class EnemyShip(TargetingSprite):
+    """
+    Extends TargetingSprite to represent an enemy ship on the screen. Starts
+    at a random point offscreen and always moves towards target point.
+    Periodically shoots lasers towards target point. In order for target
+    point to change (for example, to follow the player's sprite), the
+    target's coordinates must be updated by the caller.
+
+    Makes use of many TargetingSprite attributes and methods.
+
+    Attributes:
+    These are just the ones that Asteroid actively uses. It has others
+    that it inherits from TargetingSprite and arcade.Sprite.
+        :angle: (numeric) Angle of the sprite (0 is East).
+        :center_x: (numeric) x-coordinate of the sprite's center point on the
+            screen.
+        :center_y: (numeric) y-coordinate of the sprite's center point on the
+            screen.
+        :change_angle: (numeric) Number of degrees and direction (positive is
+            counterclockwise) to change sprite's angle in on_update().
+        :change_x: (numeric) Number of pixels and direction (positive is
+            right) to change sprite's center_x in on_update().
+        :change_y: (numeric) Number of pixels and direction (positive is
+            up) to change sprite's center_y in on_update().
+        :diagonal: (numeric) Diagonal measurement of sprite in pixels.
+        :image_rotation: (numeric) Degrees that the original sprite image
+            needs to be rotated to face North.
+        :laser_fade_rate: (numeric) amount to subtract from laser's alpha
+            (making it transparent) on each update after 60. 255 makes it
+            instantly disappear; 0 makes it never disappear.
+        :laser_filename: (str) Image filename for laser sprite.
+        :laser_list: (arcade.SpriteList) SpriteList to which to add lasers.
+            Passed by reference so can be shared between objects if needed.
+        :laser_rotation: (numeric) Degrees that the original laser image
+            needs to be rotated to face North.
+        :laser_scale: (numeric) Size of the laser relative to source image.
+        :laser_sound: (arcade.Sound) Sound to play when laser is instantiated.
+        :laser_speed: (numeric) Pixels per second to move laser forward.
+        :reload_time: (int) Number of updates left before sprite shoots
+            again. Set equal to laser_speed.
+        :speed: (numeric) Pixels per second to move sprite forward in
+            on_update. Set equal to 0, forward_rate or -forward_rate.
+        :target_x: (numeric) X-coordinate of target point.
+        :target_y: (numeric) Y-coordinate of target point.
+    """
+
     def __init__(self, image_filename: str, scale: Union[int, float],
-                 image_rotation: Union[int, float], laser_filename: str,
+                 image_rotation: Union[int, float],
+                 speed_range: Union[int, Tuple[int], Tuple[int, int],
+                                    Tuple[int, int, int]],
+                 laser_filename: str,
                  laser_scale: Union[int, float],
                  laser_rotation: Union[int, float],
-                 laser_list: arcade.SpriteList, laser_speed: int = 0,
+                 laser_list: arcade.SpriteList,
                  laser_fade_rate: Union[int, float] = 40,
                  laser_sound: Optional[arcade.Sound] = None):
+        """
+        Constructor. Instantiate the sprite at default sprite location (0, 0)
+        with default target point (0, 0), and a random speed. Caller must
+        set a different starting location and target point after
+        instantiation, either specifically or by calling
+        set_random_offscreen_location(), etc. This is intentional because,
+        in some situations, the caller may not want EnemyShips to appear
+        randomly offscreen, so I don't want to waste time calling that
+        function during __init__() to have the location be reset immediately.
+
+        :param str image_filename: Filename of sprite's source image.
+        :param numeric scale: Size of the sprite relative to source image.
+        :param numeric image_rotation: Degrees that the original image needs
+            to be rotated counterclockwise to face East.
+        :param int or int tuple speed_range: Range of possible integer speeds
+            for sprite.
+        :param str laser_filename: Image filename for laser sprite.
+        :param numeric laser_scale: Size of the laser relative to source.
+        :param numeric laser_rotation: Degrees that the original laser image
+            needs to be rotated to face East.
+        :param arcade.SpriteList laser_list: SpriteList to which to add
+            lasers.
+        :param numeric laser_fade_rate: amount to subtract from laser's
+            alpha (making it transparent) on each update after 60. 255 makes
+            it instantly disappear; 0 makes it never disappear.
+        :param arcade.Sound laser_sound: Sound to play when laser is
+            instantiated.
+        """
 
         # Validate parameters
         if not isinstance(image_filename, str):
@@ -1286,6 +1362,16 @@ class EnemyShip(TargetingSprite):
             raise ValueError("ValueError: scale must be positive")
         if not isinstance(image_rotation, (int, float)):
             raise TypeError("TypeError: image_rotation must be a numeric type")
+        if not isinstance(speed_range, (int, tuple)):
+            raise TypeError("TypeError: speed_range must be an int or tuple")
+        if isinstance(speed_range, tuple):
+            if not 1 <= len(speed_range) <= 3:
+                raise ValueError("ValueError: speed_range must have 1, 2 or 3"
+                                 " elements")
+            for elem in speed_range:
+                if not isinstance(elem, int):
+                    raise TypeError("TypeError: elements of speed_range must"
+                                    " be integers")
         if not isinstance(laser_filename, str):
             raise TypeError("TypeError: laser_filename must be a string")
         if not isinstance(laser_scale, (int, float)):
@@ -1297,14 +1383,12 @@ class EnemyShip(TargetingSprite):
         if not isinstance(laser_list, arcade.SpriteList):
             raise TypeError("TypeError: laser_list must be an "
                             "arcade.SpriteList")
-        if not isinstance(laser_speed, int):
-            raise TypeError("TypeError: laser_speed must be an int")
-        if laser_speed < 0:
-            raise ValueError("ValueError: laser_speed must be non-negative")
+
+        # Although these are validated by the laser class when instantiated,
+        # I want to validate them here so an enemy doesn't get created with
+        # invalid attribute values
         if not isinstance(laser_fade_rate, (int, float)):
             raise TypeError("TypeError: laser_fade_rate must be numeric")
-        # TODO: ASK -- things like this are also checked in laser. is it okay
-        #  to check in both places? what's best practice?
         if laser_fade_rate < 0:
             laser_fade_rate = 0
         if laser_fade_rate > 255:
@@ -1314,23 +1398,36 @@ class EnemyShip(TargetingSprite):
 
         super().__init__(image_filename, scale, file_rotation=image_rotation)
 
-        # Pointer to game window's enemy_laser_list
+        # Set random speed for sprite
+        self.set_speed_in_range(speed_range)
+
+        # Pointer (pointer?) to game window's enemy_laser_list
         self.laser_list = laser_list
 
-        # Laser image
+        # Laser data
         self.laser_filename = laser_filename
         self.laser_scale = laser_scale
-        self.laser_rotation = laser_rotation - self.image_rotation
+        self.laser_sound = laser_sound
         self.laser_fade_rate = laser_fade_rate
 
-        self.laser_speed = laser_speed
+        # Rotation of Laser source image relative to EnemyShip source image
+        self.laser_rotation = laser_rotation - self.image_rotation
 
-        # Ships should be able to shoot the moment they're created
-        self.reload_time = laser_speed
+        # Lasers should always be faster than ships, and anything slower
+        # than 50 just looks too slow. Also, if an EnemyShip's speed is
+        # negative (moving away from target while facing it), it should still
+        # shoot towards target
+        self.laser_speed = max(3 * self.speed, 50)
 
-        self.laser_sound = laser_sound
+        # Ships shouldn't be able to shoot the moment they're created
+        self.reload_time = self.laser_speed
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+        """
+        Updates the sprite's location and angle, and shoots lasers.
+        :param float delta_time:  Time since last update.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -1339,18 +1436,20 @@ class EnemyShip(TargetingSprite):
             raise ValueError("ValueError: delta_time must be non-negative")
 
         # Moves sprite towards target point at speed, returns angle to target
-        # TODO: ASK -- Technically this argument isn't necessary,
-        #  but it adds clarity
         angle_rad = super().on_update(delta_time)
 
-        # Set angle of ship to match angle of movement
-        # angle_rad is the measured from the positive x axis, but image
-        # initially faces down
+        # Set angle of ship to match angle of movement, accounting for
+        # source image rotation
+        # This instantly turns enemies towards target instead of rotating
+        # time slowly.
         self.angle = math.degrees(angle_rad) + self.image_rotation
 
-        # Periodically shoot at player, unless there's no reload time
+        # If reload time is None, don't shoot any lasers. This allows for
+        # non-shooting EnemyShips to exist
         if self.reload_time is None:
             return
+
+        # Decrement reload_time and shoot laser once it reaches zero
         self.reload_time -= 1
         if self.reload_time <= 0:
             self.laser_list.append(Laser(self.center_x, self.center_y,
@@ -1361,9 +1460,15 @@ class EnemyShip(TargetingSprite):
                                          speed=self.laser_speed,
                                          fade_rate=self.laser_fade_rate,
                                          sound=self.laser_sound))
+
+            # Reset reload_time
             self.reload_time = self.laser_speed
 
     def __str__(self) -> str:
+        """
+        Returns string representation of EnemyShip object.
+        :return str: String representation of EnemyShip object.
+        """
         return ("<EnemyShip: center_x = {}, center_y = {}, speed = {}, "
                 "target_x = {}, target_y = {}, change_x = {},"
                 " change_y = {}, laser_speed = {}, reload_time = {}>".format(
@@ -1986,6 +2091,7 @@ class GameView(arcade.View):
             enemy = EnemyShip(self.level_settings['enemy ship'][self.level],
                               self.enemy_ship_image_scale,
                               self.enemy_ship_image_rotation,
+                              speed_range,
                               self.enemy_laser_filename,
                               self.enemy_laser_image_scale,
                               self.enemy_laser_image_rotation,
@@ -1995,12 +2101,6 @@ class GameView(arcade.View):
                               laser_sound=self.enemy_laser_sound)
 
             enemy.set_random_offscreen_location(self.width, self.height)
-
-            enemy.set_speed_in_range(speed_range)
-
-            # Lasers should always be faster than ships, and anything slower
-            # than 50 just looks too slow
-            enemy.laser_speed = max(3 * enemy.speed, 50)
 
             self.enemy_list.append(enemy)
 
