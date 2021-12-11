@@ -2412,9 +2412,28 @@ class GameView(arcade.View):
         arcade.draw_text("Extra Lives: {}".format(self.lives), 20,
                          self.height - 90, font_size=14, bold=True)
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def on_update(self, delta_time: float = 1 / 60) -> None:
         """
-        Main game logic
+        Main game logic.
+        Switches to the next level or the winning screen if the player has
+        enough points. Restarts current level with or switches to game lost
+        screen if player has been hit. Both processes take several updates
+        to play out, for a smoother transition, so this method begins or
+        continues one of the processes. Leveling up and dying are mutually
+        exclusive, with leveling up taking precedence if the criteria for
+        both are met at the same time.
+        Updates player lives. Updates player points based on what they've
+        shot. Updates Player's location and angle, and whether they're
+        shooting. Spawns new Asteroids and EnemyShips as needed. Updates
+        Asteroid and EnemyShips' locations, and EnemyShips' target point,
+        direction they're facing, and shoots Lasers. Removes sprites that
+        have collided with each other and replaces them with Explosions.
+        Updates all sprites, including Laser positions and Explosion
+        animations.
+        Does all this by calling helper methods.
+
+        :param float delta_time: Time since last update.
+        :return: None
         """
 
         # Validate parameters
@@ -2439,32 +2458,36 @@ class GameView(arcade.View):
         if not self.leveling_up:
             self.update_lives_based_on_hits()
 
-        # Increment count of updates this level after level_up_if_points()
-        # that calls setup, which returns to it, which returns to on_update,
-        # which then continues, and we want to count this update
+        # Increment count of updates this level after
+        # update_level_based_on_points() and update_lives_based_on_hits()
+        # because they call setup(), which returns to them, and they return
+        # to on_update, which then continues, and I want to count this update.
         self.updates_this_level += 1
 
-        # Check collisions
-
+        # Check collisions for points
         # Check collisions before moving sprites so on_draw  (and the player
         # seeing sprite positions) happens between sprites hitting each other
         # and getting deleted. Otherwise, sprites could be deleted based on
         # their new positions without those positions ever being drawn
         self.update_points_based_on_strikes()
 
-        # player-dictated actions
+        # Update Player sprite's movement attributes based on GameView
+        # attributes that track player input (like whether UP is pressed).
         self.update_player_speed_angle_change_based_on_input()
 
-        # Spawn new asteroids and enemies
+        # Spawn new asteroids and enemies as fast as their spawn_rates
         self.spawn_asteroids_and_enemies()
 
         # Set targets for enemy sprites
         self.set_targets_for_enemies()
 
         # Update all sprite lists
-        # an arcade.SpriteList object has a list attribute that holds all the
-        # sprites in the SpriteList. on_update() iterates through the list,
-        # calling the on_update() method of each sprite
+        # An arcade.SpriteList object has a list attribute that holds all the
+        # sprites in the SpriteList. on_update() iterates through the list
+        # with a for loop, calling the on_update() method of each sprite.
+        # The sprites' on_update positions change their locations and angles,
+        # and textures as needed, animating sprite movement.
+        # See each sprite's on_update or update method for execution details.
         self.player_list.on_update(delta_time)
         self.player_laser_list.on_update(delta_time)
         self.asteroid_list.on_update(delta_time)
@@ -2473,60 +2496,112 @@ class GameView(arcade.View):
         self.explosion_list.update()
 
     def update_level_based_on_points(self) -> None:
+        """
+        Checks whether the player has enough points to beat the current level.
+        If so, and there's a higher level, starts or continues transition to
+        the next level. If the current level is the highest in the game,
+        starts or continues the transition to a GameWonView.
+
+        The switch to a new level after meeting the criteria to level up is
+        slightly delayed to allow last Explosions to play out, and to start
+        the level-up or game-won sounds before changing screen. This gives
+        a smoother feeling to the level transitions.
+
+        If the criteria for leveling up or winning is met, begin the
+        transition process if it has not already begun. If the transition
+        is already in progress, count updates until it's time to switch
+        levels and then switch.
+
+        :return: None
+        """
+
         # If points goal reached for this level, jump to the next one
         if self.points >= self.level_settings['points goal'][self.level]:
 
+            # Check that the current level is not the highest in the game.
             # level is used to index into level_settings tuples, but
             # level_limit is the minimum length of those tuples, so level
             # must always be at least one less than level_settings
             if self.level < self.level_limit - 1:
-                # If hasn't played sound and there is sound to play
+
+                # If hasn't played sound and there is sound to play, play it.
                 if not self.level_up_player and self.level_up_sound:
                     self.level_up_player = self.level_up_sound.play()
+
                 # Slightly delay switch to next level so last explosions can
-                # play out at this level
+                # play out at this level.
+                # After delay, switch levels
                 if self.leveling_up is True and self.switch_delay == 30:
                     self.level += 1
                     self.setup()
+
+                # Count updates since switch began to facilitate delay
                 else:
                     self.leveling_up = True
                     self.switch_delay += 1
+
+            # If the current level is the game's highest
             else:
+
+                # Stop playing game background music
                 # Since background_music_player is None unless sound has been
-                # played, if it is True, then background_music_player is True
+                # played, if it is not None, then background_music_player is
+                # also not None and stop() method can be called without error.
                 if (self.background_music_player
                         and self.background_music_sound.is_playing(
                             self.background_music_player)):
                     self.background_music_sound.stop(
                         self.background_music_player)
 
-                # If hasn't played sound and there is sound to play
+                # If hasn't played win sound and there's one to play, play it.
                 if not self.win_player and self.win_sound:
                     self.win_player = self.win_sound.play()
+
                 # Slightly delay switch to win screen so last explosions can
                 # play out at this level
                 if self.leveling_up is True and self.switch_delay == 30:
+
+                    # After delay, create and show an instance of GameWonView
                     won_view = GameWonView(self.win_player, self.win_sound)
                     self.window.show_view(won_view)
+
+                # If delay threshold hasn't been met, increment count of
+                # updates since transition began
                 else:
                     self.leveling_up = True
                     self.switch_delay += 1
 
     def update_lives_based_on_hits(self) -> None:
+        """
+        Checks whether the player has been hit and needs to lose a life.
+        If so, and there are lives left, starts or continues transition to
+        restarting current level with one less life. If there are no more
+        lives left, starts or continues the transition to a GameLostView.
+
+        The switch to restarting the level or losing the game after meeting
+        the criteria to do so is slightly delayed to allow last Explosions to
+        play out, and to start the lost-life or game-lost sounds before
+        changing screen. This gives a smoother feeling to the transitions.
+
+        If the criteria for restarting a level or losing the game is met,
+        begin the transition process if it has not already begun. If the
+        transition is already in progress, count updates until it's time to
+        switch levels and then switch.
+
+        :return: None
+        """
 
         # If the player hasn't already been hit and is dying, check if they've
         # been hit this time
         if not self.dying:
 
             # List of total hits from each iteration of the loop below
-            # Not necessary with one player sprite, but will be if using
-            # multiple player sprites
             hits = []
 
             # If the player collides with any other sprite, they die
-            # Like with draw() method, use sprite list to check instead of
+            # Like with draw() method, use SpriteList to check instead of
             # self.player_sprite so that collisions don't get checked if
-            # player dies and is removed from list
+            # player dies and is removed from SpriteList
             for player in self.player_list:
 
                 # arcade function that checks for collisions between a Sprite
@@ -2536,23 +2611,31 @@ class GameView(arcade.View):
                              self.enemy_list])
                 hits += h
 
+            # If there are hits, it's because something (or some things) have
+            # hit the player, so create an Explosion at their location
             if hits:
                 self.explosion_list.append(Explosion(
                     self.explosion_textures, self.player_sprite.center_x,
                     self.player_sprite.center_y, self.explosion_image_scale,
                     self.explosion_sound))
 
+                # Remove all Sprites in collision (they shouldn't still be
+                # visible and movable if they've been destroyed in an
+                # explosion)
                 for hit in hits:
                     hit.remove_from_sprite_lists()
 
+                # Remove the player sprite from lists, too, so it can't be
+                # drawn, moved, or hit by anything
                 self.player_sprite.remove_from_sprite_lists()
 
+                # If the Player is hit, then the dying process begins
                 self.dying = True
 
         # If the player is dying, including from a hit on this update
         if self.dying:
 
-            # If lives left, restart level
+            # If lives left, restart level (remember, self.lives starts at 0)
             if self.lives >= 1:
 
                 # If there is a sound, but it hasn't been played, play it
@@ -2569,6 +2652,7 @@ class GameView(arcade.View):
                     # Restart this level
                     self.setup()
 
+                # If not ready to switch, count updates since dying started
                 else:
                     self.dying = True
                     self.switch_delay += 1
@@ -2576,6 +2660,7 @@ class GameView(arcade.View):
             # If out of lives go to ending screen
             else:
 
+                # Stop background music
                 # Since background_music_player is None unless sound has been
                 # played, if it is True, then background_music_sound must
                 # exist, so it can be stopped
@@ -2585,7 +2670,8 @@ class GameView(arcade.View):
                     self.background_music_sound.stop(
                         self.background_music_player)
 
-                # If hasn't played sound and there is a sound to play
+                # If hasn't played game-over sound and there is one to play,
+                # play it (only want it to play once)
                 if not self.game_over_player and self.game_over_sound:
                     self.game_over_player = self.game_over_sound.play()
 
@@ -2597,11 +2683,20 @@ class GameView(arcade.View):
                     game_lost_view = GameLostView()
                     self.window.show_view(game_lost_view)
 
+                # If not switching yet, count updates that switch has been
+                # delayed
                 else:
                     self.dying = True
                     self.switch_delay += 1
 
     def update_points_based_on_strikes(self) -> None:
+        """
+        Count collisions between Player's Lasers and Asteroids, and Player's
+        Lasers and EnemyShips. Add points for each hit to self.points total.
+
+        :return: None
+        """
+
         # Check player laser collisions
         # Lists to track hit asteroids and enemies separately for scoring
         asteroids_hit = []
@@ -2627,12 +2722,12 @@ class GameView(arcade.View):
                 self.player_laser_list[i].remove_from_sprite_lists()
 
                 # Add these hit asteroids and enemies to lists of all hit
-                # asteroids
-                # and enemies
+                # asteroids and enemies
                 asteroids_hit += asteroids
                 enemies_hit += enemies
 
         # Add points for each hit
+        # Eg, if each Asteroid is worth 5 and 10 were hit, add 50 points
         self.points += self.asteroid_points * len(asteroids_hit)
         self.points += self.enemy_points * len(enemies_hit)
 
@@ -2640,39 +2735,85 @@ class GameView(arcade.View):
         self.remove_and_explode(asteroids_hit)
         self.remove_and_explode(enemies_hit)
 
-    # Didn't want to call the list of sprites sprite_list because it
-    # could be confused with a SpriteList
-    def remove_and_explode(self, list_o_sprites: List[arcade.Sprite]):
+    def remove_and_explode(self, list_o_sprites: List[arcade.Sprite]) -> None:
         """
-        Removes all sprites from list, leaving explosions where they were.
+        Removes all sprites in given list from all SpriteLists and leaves
+        Explosions where they were.
+
+        :param List[arcade.Sprite] list_o_sprites: List of Sprites (including
+            subclasses of arcade.Sprite). Didn't want to call the list of
+            sprites sprite_list because it could be confused with a SpriteList
+        :return: None
         """
 
         # Validate parameters
         if not isinstance(list_o_sprites, list):
-            raise TypeError("TypeError: sprite_list must be a list")
+            raise TypeError("TypeError: list_o_sprites must be a list")
 
+        # Iterate over given list
         for sprite in list_o_sprites:
+
+            # Put an Explosion object in the sprite's location
             self.explosion_list.append(Explosion(self.explosion_textures,
                                                  sprite.center_x,
                                                  sprite.center_y,
                                                  self.explosion_image_scale,
                                                  self.explosion_sound))
+
+            # Remove sprite from SpriteLists
             sprite.remove_from_sprite_lists()
 
     def update_player_speed_angle_change_based_on_input(self) -> None:
-        # Update player change_movement based on key presses
-        # Default to no movement if keys aren't pressed
+        """
+        Updates Player's speed, change_angle and shooting attributes based
+        on GameView attributes that track user input. For example, translates
+        self.up_pressed into forward speed for the Player sprite, which
+        translates into actual forward movement in the Player sprite's
+        on_update.
+
+        :return: None
+        """
+
+        # Default to no movement if keys aren't pressed or opposite keys are
+        # pressed
         self.player_sprite.change_angle = 0
         self.player_sprite.speed = 0
 
         # TODO: ASK -- why isn't this working for
         #  Issue where if L and U are pressed, D won't stop U/D movement
 
+        # Movement should only happen if one of a pair of directions
+        # (left/right or up/down) is indicated.
         # If opposite keys are pressed, movement shouldn't occur
+
+        # This works such that the player can spin in place with left or
+        # right, move straight with up or down, and move in curves with
+        # one of left/right and one of up/down. If up and down are pressed,
+        # the player doesn't move forward or back, and if left and right are
+        # pressed, the player doesn't spin.
+
+        # If three directions are indicated (eg left, right and up), then
+        # the two opposite ones (eg left and right) should cancel out,
+        # leaving the third to be the only one to have any effect. For
+        # example, if left, right, and up are pressed, then left and right
+        # should cancel out so there's no spin, and the Player should just
+        # move forward as if only up were pressed. However, there's a bug
+        # that makes it so this doesn't happen. Currently, if two directions
+        # are indicated, and then a third is made True (eg if on one update
+        # left and up had been True and on the next update left, right, and
+        # up were True), then the third direction doesn't register. I haven't
+        # been able to track down this bug (it may be in my keyboard, my code,
+        # or the underlying Pyglet code), but there's no reason for a player
+        # to ever try to try to move in three directions at once, so the bug
+        # doesn't impact gameplay.
+
+        # Turning left/right
         if self.right_pressed and not self.left_pressed:
             self.player_sprite.change_angle = -self.player_sprite.angle_rate
         elif self.left_pressed and not self.right_pressed:
             self.player_sprite.change_angle = self.player_sprite.angle_rate
+
+        # Moving forward/back
         if self.up_pressed and not self.down_pressed:
             self.player_sprite.speed = self.player_sprite.forward_rate
         elif self.down_pressed and not self.up_pressed:
@@ -2682,41 +2823,80 @@ class GameView(arcade.View):
         # is pressed
         self.player_sprite.shooting = self.space_pressed
 
-    # Although the code for refilling asteroids and enemies is almost
-    # identical, it didn't seem practical to create a more generic function
-    # that could be called once for each because the method would require
-    # several parameters that, including ones that are passed by value, not
-    # by reference, so so much extra code would have to be written to support
-    # that generic refilling function that the result would be longer and
-    # less clear than this method.
     def spawn_asteroids_and_enemies(self) -> None:
         """
-        Spawn new asteroids and enemies at the intervals indicated by their
-        spawn rates.
+        Spawn new Asteroids and EnemyShips at the intervals indicated by their
+        spawn rates. Works on all levels, including ones with no Asteroids
+        or EnemyShips.
+
+        Although the code for refilling asteroids and enemies is almost
+        identical, it didn't seem practical to create a more generic function
+        that could be called once for each because the method would require
+        many parameters, including ones that are passed by value, not
+        by reference. So much extra code would have to be written to support
+        that generic refilling function that the result would be longer and
+        less clear than this method.
+
+        :return: None
         """
-        # If there asteroids spawn on level, add another num on interval
+
+        # If there Asteroids to spawn on level, add a new one at the rate
+        # of their spawn rate
         if self.level_settings['asteroid spawn rate'][self.level] > 0:
+
+            # Count down updates until it's time to spawn another Asteroid
             if self.asteroids_spawning > 0:
                 self.asteroids_spawning -= 1
             else:
+
+                # When it's time to spawn another Asteroid, call make_asteroids
+                # to make an instance of Asteroid and append it to the asteroid
+                # list.
                 self.make_asteroids(1,
                                     self.level_settings[
                                         'asteroid speed range'][self.level])
+
+                # Reset asteroids_spawning to start countdown to next
+                # Asteroid's creation
                 self.asteroids_spawning = 60 // self.level_settings[
                     'asteroid spawn rate'][self.level]
 
-        # If enemies spawn on this level, add new one on interval
+        # If there EnemyShips to spawn on level, add a new one at the rate
+        # of their spawn rate
         if self.level_settings['enemy spawn rate'][self.level] > 0:
+
+            # Count down updates until it's time to spawn another EnemyShip
             if self.enemies_spawning > 0:
                 self.enemies_spawning -= 1
             else:
+
+                # When it's time to spawn another EnemyShip, call
+                # make_enemy_ships to make an instance of EnemyShip and
+                # append it to the enemy list.
                 self.make_enemy_ships(1,
                                       self.level_settings[
                                           'enemy speed range'][self.level])
+
+                # Reset asteroids_spawning to start countdown to next
+                # Asteroid's creation
                 self.enemies_spawning = 60 // self.level_settings[
                     'enemy spawn rate'][self.level]
 
     def set_targets_for_enemies(self) -> None:
+        """
+        For all EnemyShips in enemy_list, updates target point to be Player
+        sprite's current center point. This is what allows EnemyShip's
+        on_update method to make EnemyShips follow the Player around and
+        shoot directly at it.
+
+        If player_list is empty (because Player is dead), stop EnemyShips
+        from shooting and slow their speeds to a stop. After a pause, change
+        set EnemyShips' speeds to negative so they retreat backwards in the
+        direction from whence they came.
+
+        :return: None
+        """
+
         # Set enemies' new target point as player's current (soon-to-be-old)
         # location
         if len(self.player_list) >= 1:
@@ -2726,20 +2906,45 @@ class GameView(arcade.View):
 
         # If player is dead, make enemies stop shooting and pause, then
         # retreat backwards slowly
+
+        # Amount to subtract from EnemyShips' speeds when slowing to stop
+        slow_rate = 10
+
+        # Number of updates before starting to slow EnemyShips to stop
+        time_to_stop = 40
+
+        # Number of updates before making EnemyShips retreat
+        time_to_retreat = time_to_stop + 30
+
+        # If player_list is empty, it's because Player sprite has been hit
+        # This is when I want the EnemyShips to slow and retreat
         if len(self.player_list) == 0:
             for enemy in self.enemy_list:
+
                 # Stop shooting
                 enemy.reload_time = None
-                # Pause before retreating.
-                # Only visible if this delay is less than the time to restart
-                # the level (right now they're equal).
-                # I don't want it visible now, but I want the ability to make
-                # it visible in the future.
-                if self.switch_delay > 60:
+
+                # Retreat backwards from where Player died.
+                # Only visible if time_to_retreat is less than the time
+                # to restart the level. I don't want it visible now, but I
+                # want the ability to make it visible in the future.
+                if self.switch_delay > time_to_retreat and enemy.speed >= 0:
+
+                    # Set reverse speeds in same range as forwads speeds for
+                    # the level
+                    enemy.set_speed_in_range(self.level_settings[
+                                                 'enemy speed range'][
+                                                 self.level])
+                    enemy.speed *= -1
+
+                # Slow to a stop
+                # Only visible if time_to_stop is less than the time to
+                # restart the level.
+                elif self.switch_delay > time_to_stop:
                     if enemy.speed >= 0:
-                        enemy.speed -= 10
-                    elif enemy.speed > -100:
-                        enemy.speed *= 1.2
+                        enemy.speed -= slow_rate
+                        if enemy.speed < 0:
+                            enemy.speed = 0
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
 
