@@ -1997,7 +1997,7 @@ class GameView(arcade.View):
         self.explosion_textures = explosion_textures[0]
         self.explosion_image_scale = explosion_textures[1]
 
-        # Filenames and scale for sprite images
+        # Filenames, scale and rotation for sprite images
         self.player_ship_filenames = player_ship_image_files[0]
         self.player_ship_image_scale = player_ship_image_files[1]
         self.player_ship_image_rotation = player_ship_image_files[2]
@@ -2014,6 +2014,8 @@ class GameView(arcade.View):
         self.enemy_laser_image_scale = enemy_laser_image_file[1]
         self.enemy_laser_image_rotation = enemy_laser_image_file[2]
 
+        # No need for rotation for asteroids since they have no definite
+        # direction they face, and since they spin
         self.asteroid_filenames = asteroid_image_files[0]
         self.asteroid_image_scale = asteroid_image_files[1]
 
@@ -2021,6 +2023,7 @@ class GameView(arcade.View):
 
         # Sound
         self.background_music_sound = arcade.load_sound(background_music)
+
         # Sound player. Can be used to check if sound is playing or has ever
         # played. None means it's never been played.
         self.background_music_player = None
@@ -2054,12 +2057,6 @@ class GameView(arcade.View):
 
         # Highest level in the game (start counting at level 1, not 0)
         self.level_limit = 3
-
-        # TODO: ASK
-        #  - should be tuple of dictionaries or dictionary of tuples (current)?
-        #  - should these be stored directly as attributes at the start of
-        #  the level so less work has to be done checking level updates vs
-        #  spawn rate, etc?
 
         # Level settings store specific settings (which ship image to
         # use, how many asteroids or enemies to have, etc.)
@@ -2159,15 +2156,20 @@ class GameView(arcade.View):
 
     def setup(self) -> None:
         """
-        Sets or resets game when the window is opened or the game is
-        restarted.
+        Sets or resets to the start of the level indicated by self.level.
+        Resets updates_this_level, leveling_up, dying, and switch_delay.
+        Resets sounds that are playing. Sets all attributes that hold
+        SpriteLists to hold empty SpriteLists. Creates an instance of Player
+        and instances of Asteroid and EnemyShip based on current level's
+        settings.
+
         :return: None
         """
 
         # Number of updates since level started
         self.updates_this_level = 0
 
-        # At new level or new live, reset
+        # At new level or new life, reset
         self.leveling_up = False
         self.dying = False
         self.switch_delay = 0
@@ -2192,6 +2194,8 @@ class GameView(arcade.View):
         # defensively in case a later iteration of the program makes it
         # optional
         if self.background_music_sound:
+
+            # Restart background music
             self.background_music_player = self.background_music_sound.play(
                 loop=True)
 
@@ -2235,6 +2239,7 @@ class GameView(arcade.View):
                                         'player laser fade'][self.level],
                                     laser_sound=self.player_laser_sound)
 
+        # Place Player in the center of the screen
         self.player_sprite.center_x = self.width // 2
         self.player_sprite.center_y = self.height // 2
 
@@ -2268,6 +2273,15 @@ class GameView(arcade.View):
     def make_asteroids(self, num_asteroids: int,
                        speed_range: Union[int, Tuple[int], Tuple[int, int],
                                           Tuple[int, int, int]]) -> None:
+        """
+        Appends num_asteroids number of Asteroid objects that move at speeds
+        within speed_range to self.asteroid_list.
+
+        :param int num_asteroids: Number of Astroids to create.
+        :param int or int tuple speed_range: Range of ints in which
+            Asteroids' speeds should fall.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(num_asteroids, int):
@@ -2286,6 +2300,7 @@ class GameView(arcade.View):
                                     " be integers")
 
         for i in range(num_asteroids):
+
             # This class init method makes sure there's at least one file in
             # self.asteroid_filenames. Choose random image to be asteroid in
             # order to have variety.
@@ -2297,6 +2312,15 @@ class GameView(arcade.View):
     def make_enemy_ships(self, num_enemies: int,
                          speed_range: Union[int, Tuple[int], Tuple[int, int],
                                             Tuple[int, int, int]]) -> None:
+        """
+        Appends num_enemies number of EnemyShip objects that move at speeds
+        within speed_range to self.enemy_list.
+
+        :param int num_enemies: Number of EnemyShip to create.
+        :param int or int tuple speed_range: Range of ints in which
+            EnemyShips' speeds should fall.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(num_enemies, int):
@@ -2315,7 +2339,8 @@ class GameView(arcade.View):
                                     " be integers")
 
         for i in range(num_enemies):
-            # Pass laser list to enemy so enemy can fill it
+
+            # Pass laser list to enemy so enemy can append to it
             # Use the first image for levels 1 and 2, then switch for level 3
             # noinspection PyTypeChecker
             enemy = EnemyShip(self.level_settings['enemy ship'][self.level],
@@ -2330,28 +2355,39 @@ class GameView(arcade.View):
                                   'enemy laser fade'][self.level],
                               laser_sound=self.enemy_laser_sound)
 
+            # Set starting location offscreen
             enemy.set_random_offscreen_location(self.width, self.height)
 
             self.enemy_list.append(enemy)
 
     def on_draw(self) -> None:
+        """
+        Draws window background and all sprites to the screen. Gets called
+        60 times a second and is the visual partner of on_update that
+        displays the animated movement in the game.
 
-        # This clears the screen for the following drawings to work
+        This is an inherited method and it utilizes the draw() method of
+        SpriteLists, which draws all sprites in a SpriteList.
+
+        :return: None
+        """
+
+        # This clears the screen for the following drawings to work.
         arcade.start_render()
 
-        # utilize arcade.SpriteList draw() method to efficiently draw sprites
+        # Utilize arcade.SpriteList draw() method to efficiently draw sprites.
 
         # Drawing with SpriteList means anything outside the viewport won't
-        # be drawn
-        # Put asteroids in the background
+        # be drawn.
+        # Put asteroids in the background.
         self.asteroid_list.draw()
 
         # Draw lasers before ships so lasers are covered by ships and look
-        # like they're growing out from the space ships
+        # like they're growing out from the space ships as they move.
         self.player_laser_list.draw()
         self.enemy_laser_list.draw()
 
-        # Draw space ships above their lasers
+        # Draw space ships above their lasers.
         self.enemy_list.draw()
 
         # Draw player in front of enemies, asteroids and lasers
@@ -2365,10 +2401,10 @@ class GameView(arcade.View):
         # player dies), nothing gets drawn.
         self.player_list.draw()
 
-        # Draw explosions in front of all other sprites
+        # Draw explosions in front of all other sprites.
         self.explosion_list.draw()
 
-        # Draw writing last so it can be seen in front of everything
+        # Draw writing last so it can be seen in front of everything.
         arcade.draw_text("Points: {}".format(self.points), 20,
                          self.height - 30, font_size=14, bold=True)
         arcade.draw_text("Level: {}".format(self.level + 1), 20,
