@@ -267,7 +267,9 @@ class Player(arcade.Sprite):
                  laser_fade_rate: Union[int, float] = 15,
                  laser_sound: Optional[arcade.Sound] = None):
         """
-        Constructor.
+        Constructor. Creates Player object with given image data and laser
+        data. Sprite's center defaults to point is at the center of the
+        screen.
 
         :param str image_filename: Filename of sprite's source image.
         :param numeric scale: Size of the sprite relative to source image.
@@ -328,8 +330,10 @@ class Player(arcade.Sprite):
         if laser_sound and not isinstance(laser_sound, arcade.Sound):
             raise TypeError("TypeError: laser_sound must be an arcade.Sound")
 
-        # Call super to create sprite object
-        super().__init__(filename=image_filename, scale=scale)
+        # Call super to create sprite object at the center of the screen
+        super().__init__(filename=image_filename, scale=scale,
+                         center_x=window_dims[0] / 2,
+                         center_y=window_dims[1] / 2)
 
         # Degrees the image needs to be rotated to face North
         self.image_rotation = image_rotation
@@ -388,6 +392,7 @@ class Player(arcade.Sprite):
     def on_update(self, delta_time: float = 1 / 60) -> None:
         """
         Updates the sprite's location and angle, and shoots lasers.
+
         :param float delta_time:  Time since last update.
         :return: None
         """
@@ -413,6 +418,7 @@ class Player(arcade.Sprite):
         on_update. Otherwise, a call to on_update with delta_time of .5
         seconds would move the sprite the same amount as a call with
         delta_time of .01.
+
         :param float delta_time: Time since last update.
         :return: None
         """
@@ -474,6 +480,7 @@ class Player(arcade.Sprite):
         shoots periodically after reload time. If player releases trigger
         to shoot repeatedly, but not constantly, shoots has quickly as player
         can hit the trigger.
+
         :return: None
         """
 
@@ -507,6 +514,7 @@ class Player(arcade.Sprite):
     def __str__(self) -> str:
         """
         Returns string representation of Player object.
+
         :return str: String representation of Player object.
         """
         return ("<Player: center_x = {}, center_y = {}, speed = {}, "
@@ -615,7 +623,8 @@ class Laser(arcade.Sprite):
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
         """
-        Updates the sprite's location.
+        Updates the sprite's location based on speed and delta_time.
+
         :param float delta_time:  Time since last update.
         :return: None
         """
@@ -659,6 +668,7 @@ class Laser(arcade.Sprite):
     def __str__(self) -> str:
         """
         Returns string representation of Player object.
+
         :return str: String representation of Player object.
         """
         return ("<Laser: center_x = {}, center_y = {}, speed = {}, "
@@ -1144,6 +1154,7 @@ class TargetingSprite(arcade.Sprite):
     def __str__(self) -> str:
         """
         Returns string representation of TargetingSprite object.
+
         :return str: String representation of TargetingSprite object.
         """
         return ("<TargetingSprite: center_x = {}, center_y = {}, speed = {}, "
@@ -1260,6 +1271,7 @@ class Asteroid(TargetingSprite):
     def __str__(self) -> str:
         """
         Returns string representation of Asteroid object.
+
         :return str: String representation of Asteroid object.
         """
         return ("<Asteroid: center_x = {}, center_y = {}, speed = {}, "
@@ -2221,27 +2233,23 @@ class GameView(arcade.View):
         self.explosion_list = arcade.SpriteList()
 
         # Set up player sprite and append to list
-        # Player ship depends upon level
         # PyCharm is confused by this first element because it comes from
         # a dictionary whose first value is a tuple of ints and PyCharm thinks
         # all values from that dict are int tuples, but this is a string
         # noinspection PyTypeChecker
-        self.player_sprite = Player(self.level_settings[
-                                        'player ship'][self.level],
-                                    self.player_ship_image_scale,
-                                    self.player_ship_image_rotation,
-                                    self.player_laser_filename,
-                                    self.player_laser_image_scale,
-                                    self.player_laser_image_rotation,
-                                    self.player_laser_list,
-                                    (self.width, self.height),
-                                    laser_fade_rate=self.level_settings[
-                                        'player laser fade'][self.level],
-                                    laser_sound=self.player_laser_sound)
+        self.player_sprite = Player(
 
-        # Place Player in the center of the screen
-        self.player_sprite.center_x = self.width // 2
-        self.player_sprite.center_y = self.height // 2
+            # Player ship depends upon level
+            self.level_settings['player ship'][self.level],
+            self.player_ship_image_scale, self.player_ship_image_rotation,
+            self.player_laser_filename, self.player_laser_image_scale,
+            self.player_laser_image_rotation, self.player_laser_list,
+            (self.width, self.height),
+
+            # Fade rate depends upon the level
+            laser_fade_rate=self.level_settings[
+                'player laser fade'][self.level],
+            laser_sound=self.player_laser_sound)
 
         # Though the player_list only holds one sprite, using a SpriteList
         # instead of the sprite itself for updating and drawing means that
@@ -2947,6 +2955,32 @@ class GameView(arcade.View):
                             enemy.speed = 0
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+        """
+        Inherited method from pyglet.window.Window through Arcade gets called
+        whenever keys are pressed. Responds to certain key presses.
+        Updates values for GameView key press attributes (up_pressed, etc.)
+        so GameView's on_update can translate presses into sprite actions.
+        Executes game or window commands to close the window, restart or pause
+        the game.
+
+        Cmd + W or Ctrl + W: Close window.
+        Cmd + R or Ctrl + R: Restart game from level 1.
+        Cmd + T or Ctrl + T: Create and show PauseView object to pause game.
+
+        Up, down, left and right arrow presses make GameView up_pressed,
+        down_pressed, left_pressed, and right_pressed attributes True.
+        Space bar press makes GameView space_pressed attribute True.
+
+        Cmd + 1: Go to level 1 with all lives and necessary points.
+        Cmd + 2: Go to level 2 with all lives and necessary points.
+        Cmd + 3: Go to level 3 with all lives and necessary points.
+        Cmd + 4: Level 3 with all lives and 15 more points needed to win.
+
+        :param int symbol: Integer representation of regular key pressed.
+        :param int modifiers: Integer representing bitwise combination of all
+            modifier keys pressed during event.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(symbol, int):
@@ -2954,29 +2988,36 @@ class GameView(arcade.View):
         if not isinstance(modifiers, int):
             raise TypeError("TypeError: modifiers must be an integer")
 
-        # Gracefully quit program
+        # Gracefully quit program.
         if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
+
+            # Closes window and runs garbage collection.
             arcade.close_window()
 
-        # Restart game
+        # Restart game.
         if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
+
+            # Reset points and level, then restart at the correct level.
             self.points = 0
             self.level = 0
             self.setup()
 
-        # Pause game
+        # Pause game.
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
 
-            # Pass this view to pause view so play can restart from the same
-            # place when the game is un-paused
+            # Pass this view to PauseView object so PauseView can restart play
+            # from the same place when the game is un-paused.
             pause = PauseView(self)
             self.window.show_view(pause)
 
         # Key presses to translate into player movement and shooting in
-        # update_player_speed_angle_change_based_on_input()
+        # update_player_speed_angle_change_based_on_input().
+        # This allows for continuous movement as long as the key is pressed
+        # and for GameView to decide whether opposite key presses should
+        # cancel out.
         # Learned this from AtiByte's video, "Python Arcade Library p05, -
         # keyboard input and smooth movement," accessible at
         # (https://www.youtube.com/
@@ -2992,7 +3033,7 @@ class GameView(arcade.View):
         if symbol == arcade.key.SPACE:
             self.space_pressed = True
 
-        # For "cheating," jumping to levels 1, 2 or 3 with full lives and
+        # For cheating: jumping to levels 1, 2 or 3 with full lives and
         # necessary points
         if symbol == arcade.key.KEY_1 and modifiers == arcade.key.MOD_COMMAND:
             self.level = 0
@@ -3022,6 +3063,19 @@ class GameView(arcade.View):
             self.setup()
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
+        """
+        Responds to certain key releases (is called whenever a key is
+        released). Updates values for GameView key press attributes
+        (up_pressed, etc.) so GameView's on_update can translate presses into
+        sprite actions. Up, down, left and right arrow releases make GameView
+        up_pressed, down_pressed, left_pressed, and right_pressed attributes
+        False. Space bar release makes GameView space_pressed attribute False.
+
+        :param int symbol: Integer representation of regular key released.
+        :param int modifiers: Integer representing bitwise combination of all
+            modifier keys released during event.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(symbol, int):
@@ -3043,6 +3097,11 @@ class GameView(arcade.View):
             self.space_pressed = False
 
     def __str__(self) -> str:
+        """
+        Returns string representation of GameView object.
+
+        :return str: String representation of GameView object.
+        """
         return ("<GameView: width = {}, height = {}, player_location = {},"
                 " num EnemyShips = {}, num Asteroids = {},"
                 " num player lasers = {}, num enemy lasers = {},"
