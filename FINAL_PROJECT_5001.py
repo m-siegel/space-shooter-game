@@ -2787,9 +2787,6 @@ class GameView(arcade.View):
         self.player_sprite.change_angle = 0
         self.player_sprite.speed = 0
 
-        # TODO: ASK -- why isn't this working for
-        #  Issue where if L and U are pressed, D won't stop U/D movement
-
         # Movement should only happen if one of a pair of directions
         # (left/right or up/down) is indicated.
         # If opposite keys are pressed, movement shouldn't occur
@@ -3161,8 +3158,8 @@ class TextView(arcade.View):
             Defaults to white.
         :main_text_scale_denominator: (int) By default, text size is scaled to
             window height. This is what to divide window height by to get font
-            size.
-        :main_text_size: (float) Font size. Defaults to 12.
+            size. Defaults to 12.
+        :main_text_size: (float) Font size. Depends on window dimensions.
         :main_text_start_y: (float) Y-coordinate of text's anchor point.
             Defaults to 1/2 of window height.
         :secondary_text: (str) Second text to draw. Defaults to information
@@ -3175,7 +3172,7 @@ class TextView(arcade.View):
         :secondary_text_scale_denominator: (int) By default, text size is
             scaled to window height. This is what to divide window height by
             to get font size. Defaults to 40.
-        :secondary_text_size: (float) Font size.
+        :secondary_text_size: (float) Font size. Depends on window dimensions.
         :secondary_text_start_y: (float) Y-coordinate of text's anchor point.
             Defaults to 1/2 of window height - font size.
         :sound: (arcade.Sound) Sound that started playing before TextView was
@@ -3380,18 +3377,28 @@ class TextView(arcade.View):
 
 class FadingView(TextView):
     """
-    Extends arcade.View to provide fading functionality. FadingView has
+    Extends TextView to provide fading functionality. FadingView has
     methods to adjust its transparency (alpha) to make itself fade in or
     out.
 
-    Note: This class isn't meant to be instantiated. It is only meant to be
-    subclassed. FadingView doesn't overide the arcade.View on_draw method,
-    meaning that it won't be visible on its own. Additionally, alpha's
-    existence doesn't change the transparency of objects on the screen; it
-    must be used in the on_draw methods of subclasses to control transparency.
+    I'd initially created this as an extension of TextView and tried to use
+    multiple inheritance when creating TitleView and InstructionsView so they
+    would inherit from both TextView and this. I wasn't sure how to do that
+    correctly though, so this seemed like a safer (dare I say more
+    "defensive") way of coding. Ideally though, this would directly subclass
+    arcade.View and not be a subclass of TextView.
+
+    Note: This class isn't meant to be instantiated itself. It is only meant
+    to be subclassed. FadingView doesn't override the TextView on_draw method
+    or the arcade.View on_update method, meaning that it doesn't render the
+    screen any differently than TextView. It does, however, provide methods
+    to fade the alpha attribute up to 255 (full opacity) or down to 0 (full
+    transparency). Alpha must be included in the color tuples (as the 4ht
+    element) in the on_draw or on_update methods of subclasses in order to
+    have an effect.
 
     Attributes:
-        Attributes in addition to those of arcade.View.
+        Attributes in addition to those of TextView.
         :alpha: (int) Int to represent transparency of objects onscreen. 255
             is opaque and 0 is invisible.
         :fade_rate: (int) Amount to add or subtract from alpha each time
@@ -3409,15 +3416,20 @@ class FadingView(TextView):
             fade_in or fade_out is called.
         """
 
-        # Validate parameters
+        # Validate parameter types and correct invalid values back into range
         if not isinstance(fade_rate, int):
             raise TypeError("TypeError: fade_rate must be an integer")
+
+        # fade_rate should be between 0 and 255
         if fade_rate < 0:
             fade_rate = 0
         elif fade_rate > 255:
             fade_rate = 255
+
         if not isinstance(alpha, int):
             raise TypeError("TypeError: alpha must be an integer")
+
+        # fade_rate should be between 0 and 255
         if alpha < 0:
             alpha = 0
         elif alpha > 255:
@@ -3425,6 +3437,7 @@ class FadingView(TextView):
 
         super().__init__()
 
+        # Set attributes
         self.alpha = alpha
         self.fade_rate = fade_rate
 
@@ -3481,33 +3494,106 @@ class FadingView(TextView):
 
 
 class TitleView(FadingView):
-    def __init__(self):
+    """
+    Subclasses FadingView to represent the game's title screen. Utilizes
+    FadingView methods to fade background colors and text in an out. Utilizes
+    TextView attributes and methods to draw background colors and text.
+    Starts completely transparent, fades in to show the title text, pauses,
+    then fades out. Once faded out, instantiates and shows an
+    InstructionsView object.
 
+    Attributes:
+        Attributes that are explicitly used here and whose values differ from
+        the defaults in super(). I'm doing it this way so that it's clearer
+        to a reader which attributes are important in which context, since
+        classes may inherit attributes and methods that they don't use.
+        :alpha: (int) Int to represent transparency of objects onscreen. 255
+            is opaque and 0 is invisible. Starts at 0.
+        :bottom_left_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            left corner of the background rectangle. Black and includes alpha.
+        :bottom_right_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            right corner of the background rectangle. Black; includes alpha.
+        :fade_rate: (int) Amount to add or subtract from alpha each time
+            fade_in or fade_out is called. Rate is 5.
+        :faded_in: (bool) Whether background and text have been fully faded
+            in.
+        :faded_out: (bool) Whether background and text have been fully faded
+            out.
+        :main_text: (str) Title text to draw.
+        :main_text_anchor_y: (int) What part of text is aligned with
+            y-coordinate of anchor point. Center.
+        :main_text_scale_denominator: (int) Text size is scaled to window
+            height. This is what to divide window height by to get font size.
+            Set to 10.
+        :main_text_size: (float) Font size. Depends on window dimensions,
+            but relatively large since main_text_scale_denominator is small.
+        :pause_count: (int) Updates remaining after faded_in before starting
+            to fade out. Takes a 60-update pause.
+        :secondary_text: (str) Since TextView's secondary_text has text by
+            default, reset to an empty string so nothing is drawn there.
+        :top_left_color: (3-tuple or 4-tuple of ints) Color of the top right
+            corner of the background rectangle. Blue and includes alpha.
+        :top_right_color: (3-tuple or 4-tuple of ints) Color of the top left
+            corner of the background rectangle. Black and includes alpha.
+    """
+
+    def __init__(self):
+        """
+        Constructor. Instantiates a transparent fading view object with a
+        fade_rate of 5. Alters TextView attribute defaults to hold only
+        title text in a relatively large font, set to appear at the center
+        of the screen.
+        """
+
+        # Instantiate transparent FadingView with fade_rate of 5
         super().__init__(5, 0)
 
-        # Set text and settings (these come from TextView)
+        # Set title text and settings (these come from TextView)
         self.main_text = "Spin\n&\nShoot"
+
+        # Small denominator means relatively large font
         self.main_text_scale_denominator = 10
         self.main_text_size = (self.window.height
                                / self.main_text_scale_denominator)
+
+        # Anchor at the center of the screen
         self.main_text_anchor_y = "center"
 
-        # Set secondary_text to empty string since TextView has text in it
+        # Set secondary_text to empty string since TextView default has text
         self.secondary_text = ""
 
         # Attributes to facilitate fading in, pausing and fading out
+        # Whether FadingView has faded in to reach an alpha of 255
         self.faded_in = False
+
+        # Number of updates to pause after fading in and before fading out
         self.pause_count = 60
+
+        # Whether FadingView has faded out to reach an alpha of 0
         self.faded_out = False
 
         # Colors. Alpha is the transparency of the color
-        self.main_text_color = (255, 255, 255, self.alpha)
-        self.bottom_left_color = (0, 0, 0, self.alpha)
+        # Although TextView's default values for text and corner colors is
+        # already white an black, its default alpha for each color is 255,
+        # so every color must be set to have the appropriate alpha
+        self.main_text_color = (255, 255, 255, self.alpha)    # White
+        self.bottom_left_color = (0, 0, 0, self.alpha)    # Black
         self.bottom_right_color = (0, 0, 0, self.alpha)
         self.top_right_color = (0, 0, 0, self.alpha)
         self.top_left_color = (0, 0, 205, self.alpha)    # Blue
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+        """
+        At each call, updates alpha or pause_count, and updates background
+        and text colors to have the correct transparency.
+
+        Over repeated calls, has the effect of fading background colors and
+        text in, pausing with them fully opaque for one second, and then
+        fading them out and switching the screen to an InstructionsView.
+
+        :param float delta_time: Time since last update.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(delta_time, (int, float)):
@@ -3544,6 +3630,12 @@ class TitleView(FadingView):
         self.top_left_color = (0, 0, 205, self.alpha)
 
     def __str__(self) -> str:
+        """
+        Returns string representation of TitleView object.
+
+        :return str: String representation of TitleView object.
+        """
+
         return ("<TitleView: faded_in = {}, pause_count = {}, faded_out = {},"
                 " alpha = {}, fade_rate = {}>".format(self.faded_in,
                                                       self.pause_count,
@@ -3553,11 +3645,57 @@ class TitleView(FadingView):
 
 
 class InstructionsView(FadingView):
-    def __init__(self):
+    """
+    Subclasses FadingView to represent the game's instructions screen.
+    Utilizes FadingView methods to fade background colors and text in.
+    Utilizes TextView attributes and methods to draw background colors and
+    text. Starts completely transparent, then fades in to show instructions.
+    When user presses space or cmd/ctrl + r, instantiates and shows a
+    GameView.
 
+    Attributes:
+        Attributes that are explicitly used here and whose values differ from
+        the defaults in super(). I'm doing it this way so that it's clearer
+        to a reader which attributes are important in which context, since
+        classes may inherit attributes and methods that they don't use.
+        :alpha: (int) Int to represent transparency of objects onscreen. 255
+            is opaque and 0 is invisible. Starts at 0.
+        :bottom_left_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            left corner of the background rectangle. Black and includes alpha.
+        :bottom_right_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            right corner of the background rectangle. Purple; includes alpha.
+        :fade_rate: (int) Amount to add or subtract from alpha each time
+            fade_in or fade_out is called. Rate is 5.
+        :faded_in: (bool) Whether background and text have been fully faded
+            in.
+        :main_text: (str) Instructions text to draw.
+        :main_text_anchor_y: (int) What part of text is aligned with
+            y-coordinate of anchor point. Center.
+        :main_text_scale_denominator: (int) Text size is scaled to window
+            height. This is what to divide window height by to get font size.
+            Set to 40.
+        :main_text_size: (float) Font size. Depends on window dimensions,
+            but relatively small since main_text_scale_denominator is large.
+        :secondary_text: (str) Since TextView's secondary_text has text by
+            default, reset to an empty string so nothing is drawn there.
+        :top_left_color: (3-tuple or 4-tuple of ints) Color of the top right
+            corner of the background rectangle. Blue and includes alpha.
+        :top_right_color: (3-tuple or 4-tuple of ints) Color of the top left
+            corner of the background rectangle. Black and includes alpha.
+    """
+
+    def __init__(self):
+        """
+        Constructor. Instantiates a transparent fading view object with a
+        fade_rate of 5. Alters TextView attribute defaults to hold only
+        instruction text in a relatively small font, set to be vertically
+        (and horizontally) centered on the screen.
+        """
+
+        # Instantiate transparent FadingView with fade_rate of 5
         super().__init__(5, 0)
 
-        # Set text and settings
+        # Instructions
         self.main_text = ("INSTRUCTIONS:"
                            "\n\n\nShoot the asteroids and enemies without"
                            " getting shot"
@@ -3569,9 +3707,13 @@ class InstructionsView(FadingView):
                            "\n\nRestart with 'cmd + r' or 'ctrl + r'"
                            "\n\nExit with 'cmd + w' or 'ctrl + w'"
                            "\n\n\nPress space to start")
+
+        # Large denominator to make text relatively small and fit on screen
         self.main_text_scale_denominator = 40
         self.main_text_size = (self.window.height
                                / self.main_text_scale_denominator)
+
+        # Center the text vertically
         self.main_text_anchor_y = "center"
 
         # Set secondary_text to empty string since TextView has text in it
@@ -3581,6 +3723,9 @@ class InstructionsView(FadingView):
         self.faded_in = False
 
         # Colors. Alpha is the transparency of the color
+        # Although TextView's default values for text and corner colors is
+        # already white an black, its default alpha for each color is 255,
+        # so every color must be set to have the appropriate alpha
         self.main_text_color = (255, 255, 255, self.alpha)
         self.bottom_left_color = (0, 0, 0, self.alpha)
         self.bottom_right_color = (65, 44, 129, self.alpha)    # Purple
@@ -3588,18 +3733,28 @@ class InstructionsView(FadingView):
         self.top_left_color = (0, 0, 205, self.alpha)    # Blue
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
+        """
+        At each call, updates alpha, and updates background and text colors
+        to have the correct transparency.
 
-        # Validate parameters
+        Over repeated calls, has the effect of fading background colors and
+        text in to be fully opaque. Once faded in, stays fully opaque.
+
+        :param float delta_time: Time since last update.
+        :return: None
+        """
+
+        # Validate parameters.
         if not isinstance(delta_time, (int, float)):
             raise TypeError("TypeError: delta_time must be numeric")
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
-        # Fade in until faded_in is True to indicate fully opaque
+        # Fade in until faded_in is True to indicate fully opaque.
         if not self.faded_in:
             self.faded_in = self.fade_in()
 
-        # Update color transparency with alpha
+        # Update color transparency with alpha.
         self.main_text_color = (255, 255, 255, self.alpha)
         self.bottom_left_color = (0, 0, 0, self.alpha)
         self.bottom_right_color = (65, 44, 129, self.alpha)
@@ -3607,6 +3762,18 @@ class InstructionsView(FadingView):
         self.top_left_color = (0, 0, 205, self.alpha)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+        """
+        Extends TextView's on_key_press functionality to respond to the
+        space bar being pressed. Executes commands to close the window or
+        start the game.
+        Cmd + W or Ctrl + W: Close window.
+        Spade bar, Cmd + R or Ctrl + R: Start game from level 1.
+
+        :param int symbol: Integer representation of regular key pressed.
+        :param int modifiers: Integer representing bitwise combination of all
+            modifier keys pressed during event.
+        :return: None
+        """
 
         # Validate parameters
         if not isinstance(symbol, int):
@@ -3614,14 +3781,23 @@ class InstructionsView(FadingView):
         if not isinstance(modifiers, int):
             raise TypeError("TypeError: modifiers must be an integer")
 
-        # Call TextView's on_key_press since it comes first
+        # Call TextView's on_key_press to handle cmd/ctrl + w and cmd/ctrl + r
         super().on_key_press(symbol, modifiers)
 
+        # Extend functionality to handle space bar event
         if symbol == arcade.key.SPACE:
+
+            # Create and show a GameView object
             game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
 
     def __str__(self) -> str:
+        """
+        Returns string representation of InstructionsView object.
+
+        :return str: String representation of InstructionsView object.
+        """
+
         return ("<InstructionsView: faded_in = {}, alpha = {}, "
                 "fade_rate = {}>".format(self.faded_in, self.alpha,
                                          self.fade_rate))
