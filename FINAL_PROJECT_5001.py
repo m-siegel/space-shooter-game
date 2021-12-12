@@ -22,17 +22,21 @@ be imported into other programs to be used as independent elements of other
 games.
 
 View classes:
-The program contains seven classes that extend the arcade.View class. These
+The program contains eight classes that extend the arcade.View class. These
 represent the various screens that a user sees (title, instructions, main
 game, game over, etc.).
 
-These classes are interconnected (for example, a GameView may create a
-PauseView object if the user hits pause, a GameLostView if the player loses,
+Most of these classes are interconnected (for example, a GameView may create
+a PauseView object if the user hits pause, a GameLostView if the player loses,
 or a GameWonView if the player wins, and each of these may create instances
-of GameView). This means that, except for FadingView, these classes can't be
-imported into other projects independently of each other, but most of the
-View subclasses may serve as templates for title, instruction, pause, and
-game over screens for other games.
+of GameView). This means that, except for TextView and FadingView, these
+classes can't be imported into other projects independently of each other,
+but most of the View subclasses may serve as templates for title,
+instruction, pause, and game over screens for other games.
+
+TextView and FadingView may be imported and used in other contexts since they
+provide generally useful functionality. They may also serve as models for
+other View subclasses with even more functionality.
 
 GameView:
 The primary logic for the game is controlled by the GameView class. This
@@ -4122,12 +4126,29 @@ def textures_from_spritesheet(filename: str, texture_width: int,
     image file with grid of sprite textures. The textures must all be the
     same width and the same height. The spritesheet's last (bottom) row may
     be partially filled by textures; all other rows are assumed to be full.
+    This function gives the user the option to only include a fraction of
+    the files in the spritesheet (for example if there are too many to be
+    useful, the function can only include 1/2 or 1/3).
+
+    A texture is an image that's associated with a Sprite. A Sprite can
+    have many textures and cycle through them to make an animation.
 
     Note: It turns out there's an Arcade function that loads a spritesheet,
     to a list but it would only save a couple lines of code and I like
     what I have here, so I'm intentionally not using Arcade's version.
-    (Next time I have to load a spritesheet in a different file, I will use
-    the Arcade function)
+    The Arcade function doesn't give the option to skip over textures during
+    the loading loop.
+
+    :param str filename: Filepath of the spritesheet file.
+    :param int texture_width: Width of the textures. Must be the same for all.
+    :param int texture_height: Height of the textures. Must be the same for
+        all.
+    :param int columns: Number of columns of textures in the spritesheet.
+    :param int num_textures: Total number of textures in the spritesheet.
+    :param int skip_rate: Denominator of the fraction of textures to INCLUDE.
+        Defaults to 1 to include all. A skip_rate of 2 would include half the
+        textures, 3 would include 1/3, and so on.
+    :return List[arcade.Texture]: List of textures extracted from spritesheet.
     """
 
     # Validate parameters
@@ -4154,24 +4175,34 @@ def textures_from_spritesheet(filename: str, texture_width: int,
     if num_textures <= 0:
         raise TypeError("skip_rate must be positive")
 
-    # List of textures (frames of an animation; ways the sprite can look, eg
-    # standing facing right vs crouching)
+    # List of textures
     textures = []
 
-    # Don't throw an error for 0 textures, but return before calling range()
+    # Defensive programming
+    # Return before calling range() so no error is thrown and a list with
+    # zero textures is returned
     if num_textures == 0:
         return textures
 
-    # Iterate over spritesheet
+    # Iterate over textures in sheet
+    # No need to continue loop after reaching the last texture, even if the
+    # image file continues beyond that
+    # Using skip_rate as the step for range means that the function can
+    # return a list with only a fraction of the textures and keep them evenly
+    # spaced.
     for i in range(0, num_textures, skip_rate):
 
-        # coordinates of top-left pixel of section to extract
-        # x coordinate changes with every image, cycling over each column
-        # in each row
+        # Coordinates of top-left pixel of section to extract.
+        # X-coordinate changes with every image, skipping the width of a
+        # texture to the right. When it's last position was at the corner of
+        # the last column, its next position is back at 0. There are columns
+        # number of images in each row, at texture_width intervals. Modulo
+        # here gives functionality of an inner loop iterating over columns.
         x = (i % columns) * texture_width
 
-        # y coordinate changes for each row, after 'columns' number of
-        # textures
+        # Y-coordinate changes for each row, after 'columns' number of
+        # textures have been visited. Integer division gives functionality of
+        # an outer loop iterating over rows.
         y = (i // columns) * texture_height
 
         # This may raise an error if the image is too short or too narrow
@@ -4186,8 +4217,10 @@ def textures_from_spritesheet(filename: str, texture_width: int,
 
 def main():
     """
-    Determines the specifics of screen size and which images to use for each
-    sprite in the game. Instantiates and runs the game window.
+    Determines the specifics of screen size and which images and sounds to
+    use for each sprite and event in the game. Instantiates an arcade.Window
+    for the game, instantiates a TitleView window to start the game, and runs
+    the program.
     """
 
     # Process images and filenames for sprites whose image data needs extra
@@ -4204,7 +4237,7 @@ def main():
                                                        "num_textures"],
                                                    EXPLOSION_SKIP_RATE)
 
-    # Set up list of 10 asteroid filenames formed from base name
+    # Create list of 10 asteroid filenames formed from base name
     asteroid_filenames = []
     for i in range(1, 5):
         asteroid_filenames.append(ASTEROID_FILENAME_BASE.format(
@@ -4217,7 +4250,8 @@ def main():
         asteroid_filenames.append(ASTEROID_FILENAME_BASE.format(
             "tiny{}".format(i)))
 
-    # Make tuples of each sprite's image filename(s) and scale
+    # Pack each sprite's image data into tuples with filenames, image scales
+    # and image rotations
     player_ship_data = (PLAYER_SHIPS, PLAYER_SHIP_SCALE, PLAYER_SHIP_ROTATION)
     player_laser_data = (PLAYER_LASER, PLAYER_LASER_SCALE,
                          PLAYER_LASER_ROTATION)
@@ -4226,24 +4260,28 @@ def main():
     asteroid_data = (asteroid_filenames, ASTEROID_SCALE)
 
     # Explosion has already been processed into list of arcade Textures
-    # so it's a tuple of Textures and scale
+    # so it's a tuple of Textures and a scale
     explosion_data = (explosion_textures, EXPLOSION_SCALE)
 
-    # Create a window object to hold the views
-    # All view objects can access it as one of their attributes without
-    # being explicitly passed it as a parameter
+    # Create a window object to hold all of the views.
+    # All view objects can access the window as one of their attributes
+    # without being explicitly passed it as a parameter.
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
+    # Pack all game parameters into a tuple
     game_parameters = (explosion_data, player_ship_data, player_laser_data,
                        enemy_ship_data, enemy_laser_data, asteroid_data,
                        BACKGROUND_SOUND, PLAYER_LASER_SOUND,
                        ENEMY_LASER_SOUND, EXPLOSION_SOUND, LEVEL_UP_SOUND,
                        LOST_LIFE_SOUND, WIN_SOUND, GAME_OVER_SOUND)
 
-    # Store game_parameters as Window attribute so all view objects can access
+    # Store game_parameters as Window attribute for all view objects to access
     window.game_parameters = game_parameters
-    # Start with title view, which calls the next view, which calls the next...
+
+    # Start with TitleView, which calls the next view, which calls the next...
     title_view = TitleView()
+
+    # Show the view and run arcade. This is what makes it all show up.
     window.show_view(title_view)
     arcade.run()
 
