@@ -3272,6 +3272,8 @@ class TextView(arcade.View):
         unpredictable if used on its own, so it should only be used in
         conjunction with an on_draw method that calls arcade.start_render()
         sometime before calling this method. (For an example, see PauseView.)
+        I used name mangling on the method name so it doesn't get called
+        automatically or accidentally, the way on_draw can.
 
         :return: None
         """
@@ -3971,34 +3973,58 @@ class PauseView(TextView):
 
     def __init__(self, game_view: GameView):
         """
+        Instantiates PauseView object for given GameView. Sets SpriteList
+        attributes to SpriteLists from GameView, gets current playback
+        position of background music and stops background music.
 
-        :param GameView game_view:
+        :param GameView game_view: GameView with which this PauseView is
+            associated.
         """
 
+        # Validate parameter
         if not isinstance(game_view, GameView):
             raise TypeError("game_view must be an instance of GameView")
+
         super().__init__()
 
+        # Store GameView
         self.game_view = game_view
+
+        # To store game_view's background music's playback position
         self.sound_time = 0
 
-        # If music, get it's current position and stop it
+        # Pause background music. This doesn't pause sound effects like
+        # leveling up, dying, or explosions.
+
+        # Defensive programing to makes sure I don't call a method on an
+        # object whose value is None
         if (self.game_view.background_music_sound
                 and self.game_view.background_music_player):
+
+            # If background music is playing
             if self.game_view.background_music_sound.is_playing(
                     self.game_view.background_music_player):
+
+                # Get the playback time of the music
                 self.sound_time = self.game_view.background_music_player.time
+
+                # Stop the music
                 self.game_view.background_music_sound.stop(
                     self.game_view.background_music_player)
 
-        # This doesn't pause sound effects like leveling up, dying, or
-        # explosions
+        # Get game_view's SpriteLists to draw
+        self.player_list = game_view.player_list
+        self.asteroid_list = game_view.asteroid_list
+        self.enemy_list = game_view.enemy_list
+        self.player_lasers = game_view.player_laser_list
+        self.enemy_lasers = game_view.enemy_laser_list
 
+        # Set text values
         self.main_text = "Paused"
         self.secondary_text = ("\n\nResume play with 'cmd + t' or 'ctrl + t'"
                                + self.secondary_text)
 
-        # Transparent white color to fill rectangle with for pause screen
+        # Transparent white color to fill rectangle with for
         # frozen-behind-veil visual effect
         self.bottom_left_color = (255, 255, 255, 100)
         self.bottom_right_color = (255, 255, 255, 100)
@@ -4007,16 +4033,17 @@ class PauseView(TextView):
         self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
                           self.top_right_color, self.top_left_color)
 
-        # Sprite lists to draw
-        self.player_list = game_view.player_list
-        self.asteroid_list = game_view.asteroid_list
-        self.enemy_list = game_view.enemy_list
-        self.player_lasers = game_view.player_laser_list
-        self.enemy_lasers = game_view.enemy_laser_list
-
     def on_draw(self) -> None:
-        # TextView doesn't have start_render in its on_draw method, so this
-        # MUST be called before calling the super's on_draw
+        """
+        The last from of GameView before it was paused with a faded
+        appearance, as if frozen behind a veil. Draws text in front.
+
+        Makes use of TextView's special _on_draw() method.
+
+        :return: None
+        """
+
+        # This must be called to clear the screen before drawing.
         arcade.start_render()
 
         # Draw sprites from SpriteLists so they're visible behind transparent
@@ -4038,6 +4065,19 @@ class PauseView(TextView):
         super()._on_draw()
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+        """
+        Extends TextView's on_key_press functionality to resume GameView
+        from its last update if cmd/ctrl + t is pressed. Uses super() to
+        execute commands to close the window or start the game.
+        Cmd + T or Ctrl + T: Unpause game.
+        Cmd + W or Ctrl + W: Close window.
+        Cmd + R or Ctrl + R: Start game from level 1.
+
+        :param int symbol: Integer representation of regular key pressed.
+        :param int modifiers: Integer representing bitwise combination of all
+            modifier keys pressed during event.
+        :return: None
+        """
 
         # Use super to handle other common key presses (cmd + r and cmd + w)
         super().on_key_press(symbol, modifiers)
@@ -4045,17 +4085,30 @@ class PauseView(TextView):
         # Unpause key combination
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
-            # If there's music playing, restart it at the same point
+
+            # If there was background music playing, restart it at the same
+            # point it was stopped during PauseView's __init__()
             if (self.game_view.background_music_sound
                     and self.game_view.background_music_player):
                 self.game_view.background_music_player = \
                     self.game_view.background_music_sound.play()
+
+                # Moves playback position to self.sound_time
                 # Learned from looking at arcade examples (Pyglet code)
                 self.game_view.background_music_player.seek(self.sound_time)
 
+            # Show the GameView object associated with this object
+            # GameView "remembers" the values of all its attributes before
+            # PauseView was shown
             self.window.show_view(self.game_view)
 
     def __str__(self) -> str:
+        """
+        Returns string representation of PauseView object.
+
+        :return str: String representation of PauseView object.
+        :return:
+        """
         return "<PauseView: game_view = {}, sound_time = {}>".format(
             self.game_view, self.sound_time)
 
