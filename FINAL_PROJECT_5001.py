@@ -1624,7 +1624,7 @@ class GameView(arcade.View):
     where they come from.
 
     Extends arcade.View with specifics for how this game runs. Inherits
-    attributes and methods from arcade.View that make a game possible.
+    methods from arcade.View that make a game possible.
     For example, as a subclass of arcade.View, GameView's on_draw
     and on_update methods get called 60 times per second without my code
     explicitly doing so. This enables animation and gameplay. Similarly, the
@@ -3115,8 +3115,299 @@ class GameView(arcade.View):
                                                len(self.explosion_list)))
 
 
-class FadingView(arcade.View):
+class TextView(arcade.View):
+    """
+    Extends arcade.View to provide easy text and background drawing
+    functionality. Includes attributes for a main string of text and a
+    secondary string of text to potentially have different sizes, colors
+    and y-anchor points. Text is always horizontally centered and wraps.
+    Includes attributes to have different colors in each corner of the screen,
+    fading and mixing in the center. Draws background colors and text. Also
+    has on_key_press method with basic functionality to start/restart the game
+    from level 1, and to close the window. If a sound is given to as a
+    parameter to TextView, TextView will stop playing it when cmd/ctrl + r is
+    pressed to restart the game.
+
+    Note: Subclasses may want to utilize TextView's method for drawing
+    a colorful rectangle with text on top of it, on top of other shapes that
+    the subclass has already drawn. In such cases, the subclass may call
+    _on_draw(), which will draw the colorful rectangle and text without first
+    clearing the screen. In such cases, the subclass's on_draw() method must
+    start with arcade.start_render(). If you don't need to draw shapes or
+    text underneath the rectangle and text drawn by TextView, you do not
+    need to override on_draw() at all. If your subclass doesn't start it's
+    on_draw method with arcade.start_render(), make sure to call this class's
+    on_draw method, not the _on_draw() method.
+
+    Attributes:
+        Attributes in addition to those of arcade.View.
+        :bg_colors: (4-tuple of color tuples) Colors of the four corners of
+            the rectangle. NOTE: This is reset every time _on_draw is called
+            to the following: bottom_left_color, bottom_right_color,
+            top_right_color, top_left_color.
+        :bg_points: (4-tuple of 2-tuples of ints) Represents the vertices of
+            the background rectangle. Points and their colors should appear
+            in the same order: bottom left, bottom right, top right, top left.
+            Defaults to corners of the window.
+        :bottom_left_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            left corner of the background rectangle. Defaults to black.
+        :bottom_right_color: (3-tuple or 4-tuple of ints) Color of the bottom
+            right corner of the background rectangle. Defaults to black.
+        :main_text_anchor_y: (int) What part of text is aligned with
+            y-coordinate of anchor point (center, baseline, bottom, or top).
+            Defaults to bottom.
+        :main_text: (str) First text to draw.
+        :main_text_color: (3-tuple or 4-tuple of ints) Color of main_text.
+            Defaults to white.
+        :main_text_scale_denominator: (int) By default, text size is scaled to
+            window height. This is what to divide window height by to get font
+            size.
+        :main_text_size: (float) Font size. Defaults to 12.
+        :main_text_start_y: (float) Y-coordinate of text's anchor point.
+            Defaults to 1/2 of window height.
+        :secondary_text: (str) Second text to draw. Defaults to information
+            about key combinations to restart the game and close the window.
+        :secondary_text_anchor_y: (int) What part of text is aligned with
+            y-coordinate of anchor point (center, baseline, bottom, or top).
+            Defaults to baseline.
+        :secondary_text_color: (3-tuple or 4-tuple of ints) Color of
+            secondary_text. Defaults to white.
+        :secondary_text_scale_denominator: (int) By default, text size is
+            scaled to window height. This is what to divide window height by
+            to get font size. Defaults to 40.
+        :secondary_text_size: (float) Font size.
+        :secondary_text_start_y: (float) Y-coordinate of text's anchor point.
+            Defaults to 1/2 of window height - font size.
+        :sound: (arcade.Sound) Sound that started playing before TextView was
+            instantiated and should be stopped playing if game is restarted.
+        :sound_player: (pyglet.media.player.Player) Player playing the sound.
+        :top_left_color: (3-tuple or 4-tuple of ints) Color of the top right
+            corner of the background rectangle. Defaults to black.
+        :top_right_color: (3-tuple or 4-tuple of ints) Color of the top left
+            corner of the background rectangle. Defaults to black.
+        :window: (arcade.Window) Window that this view is associated with.
+    """
+
+    def __init__(self, player: pyglet.media.player.Player = None,
+                 sound: arcade.Sound = None):
+        """
+        Constructor. Sets attributes to default values (listed above).
+
+        :param pyglet.media.player.Player player: Player that's playing sound.
+        :param arcade.Sound sound: Sound that's being played
+        """
+
+        # Validate parameters
+        if (player is not None
+                and not isinstance(player, pyglet.media.player.Player)):
+            raise TypeError("TypeError: player must be a "
+                            "pyglet.media.player.Player")
+        if (sound is not None
+                and not isinstance(sound, arcade.Sound)):
+            raise TypeError("TypeError: sound must be an arcade.Sound")
+
+        super().__init__()
+
+        # Set background color behind drawings
+        arcade.set_background_color((0, 0, 0))    # Black
+
+        # Main text and settings
+        self.main_text = ""
+        self.main_text_color = (255, 255, 255)    # White
+        self.main_text_scale_denominator = 12
+        self.main_text_size = (self.window.height
+                               / self.main_text_scale_denominator)
+        self.main_text_start_y = self.window.height / 2
+        self.main_text_anchor_y = "bottom"
+
+        # Secondary text and settings
+        # Many subclasses will have this secondary text
+        self.secondary_text = ("\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                               "\n\nExit with 'cmd + w' or 'ctrl + w'")
+        self.secondary_text_color = (255, 255, 255)
+        self.secondary_text_scale_denominator = 40
+        self.secondary_text_size = (self.window.height
+                                    / self.secondary_text_scale_denominator)
+        self.secondary_text_start_y = (self.window.height / 2
+                                       - self.secondary_text_size)
+        self.secondary_text_anchor_y = "baseline"
+
+        # Colors for all four corners default to black
+        self.bottom_left_color = (0, 0, 0)
+        self.bottom_right_color = (0, 0, 0)
+        self.top_right_color = (0, 0, 0)
+        self.top_left_color = (0, 0, 0)
+
+        # Colors and vertices for background rectangle
+        # Also in on_draw to accommodate dynamic changes to colors
+        self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
+                          self.top_right_color, self.top_left_color)
+        self.bg_points = ((0, 0), (self.window.width, 0),
+                          (self.window.width, self.window.height),
+                          (0, self.window.height))
+
+        # Sound, if there is one
+        self.sound_player = player
+        self.sound = sound
+
+    def on_draw(self) -> None:
+        """
+        Draw background rectangle and text.
+
+        :return: None
+        """
+
+        # Since _on_draw() doesn't have an arcade.start_render() statement, it
+        # can't be used on its own for rendering the screen. Start render
+        # here and let _on_draw do the rest. (See _on_draw for more info.)
+        arcade.start_render()
+        self._on_draw()
+
+    def _on_draw(self) -> None:
+        """
+        Draws background rectangle and text to the screen ON TOP OF whatever
+        is already there.
+
+        This method does not have an arcade.start_render() statement to clear
+        the screen before drawing. That means that it can be used by
+        subclasses as part of their on_draw() methods to draw on top of
+        something existing on the screen. This method's effect is
+        unpredictable if used on its own, so it should only be used in
+        conjunction with an on_draw method that calls arcade.start_render()
+        sometime before calling this method. (For an example, see PauseView.)
+
+        :return: None
+        """
+
+        # Normally this would be called on_draw, and its first statement
+        # would be a call to arcade.start_render to clear the screen and
+        # prepare it for drawing. I'm leaving out arcade.start_render so
+        # subclasses can call _on_draw to make use of the statements here
+        # without erasing anything else they've already drawn (eg the way
+        # PauseView does).
+        # However, if this were in the on_draw() method, it would be risky
+        # because the screen won't render properly without
+        # arcade.start_render() being called first. To prevent potential
+        # subclasses from relying on this method to draw their screens without
+        # first calling start_render(), I've tried name mangling. Subclasses
+        # and instances of this class don't need to know _on_draw is missing
+        # that key function call because they'll automatically call on_draw,
+        # which calls arcade.start_render before calling this method.
+        # Subclasses that want to draw to the screen entirely on their own,
+        # or that want to draw to the screen before calling this method to
+        # finish drawing a rectangle and text can do so by overriding on_draw
+        # and then calling this method from their override of on_draw.
+
+        # Create background rectangle each time to accommodate changes in
+        # colors
+        self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
+                          self.top_right_color, self.top_left_color)
+        background = arcade.create_rectangle_filled_with_colors(
+            self.bg_points, self.bg_colors)
+
+        # Draw background rectangle
+        background.draw()
+
+        # Use variables for many of the arguments to draw_text() in order
+        # to be general enough to be used in situations requiring different
+        # text, font sizes, locations, etc.
+        # A different version of this class could include even more variables
+        # to be even more broadly applicable, but these are the only ones
+        # I need for this project.
+        arcade.draw_text(self.main_text, self.window.width / 2,
+                         self.main_text_start_y, self.main_text_color,
+                         anchor_x="center", anchor_y=self.main_text_anchor_y,
+                         font_size=self.main_text_size,
+                         align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+        arcade.draw_text(self.secondary_text, self.window.width / 2,
+                         self.secondary_text_start_y,
+                         self.secondary_text_color, anchor_x="center",
+                         anchor_y=self.secondary_text_anchor_y,
+                         font_size=self.secondary_text_size,
+                         align="center", bold=True,
+                         width=self.window.width, multiline=True)
+
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
+        """
+        Executes commands to close the window or restart the game if the
+        player presses the correct key combination.
+        Cmd + W or Ctrl + W: Close window.
+        Cmd + R or Ctrl + R: Restart game from level 1.
+
+        :param int symbol: Integer representation of regular key pressed.
+        :param int modifiers: Integer representing bitwise combination of all
+            modifier keys pressed during event.
+        :return: None
+        """
+
+        # Validate parameters
+        if not isinstance(symbol, int):
+            raise TypeError("TypeError: symbol must be an integer")
+        if not isinstance(modifiers, int):
+            raise TypeError("TypeError: modifiers must be an integer")
+
+        # Gracefully quit program
+        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+
+            # Closes window and runs garbage collection
+            arcade.close_window()
+
+        # Restart the game
+        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
+                                       or modifiers == arcade.key.MOD_CTRL):
+
+            # Stop playing a sound if there is one
+            if self.sound_player and self.sound:
+                if self.sound.is_playing(self.sound_player):
+                    self.sound.stop(self.sound_player)
+
+            # Create a new instance of GameView and show it
+            # The asterisk unpacks the values in the tuple so its like
+            # writing out all 14 required arguments, but much neater.
+            game = GameView(*self.window.game_parameters)
+            self.window.show_view(game)
+
+    def __str__(self) -> str:
+        return ("<TextView: main_text = {}, main_text_scale_denominator = {},"
+                "secondary_text = {}, secondary_text_scale_denominator = {}"
+                ">".format(self.main_text, self.main_text_scale_denominator,
+                           self.secondary_text,
+                           self.secondary_text_scale_denominator))
+
+
+class FadingView(TextView):
+    """
+    Extends arcade.View to provide fading functionality. FadingView has
+    methods to adjust its transparency (alpha) to make itself fade in or
+    out.
+
+    Note: This class isn't meant to be instantiated. It is only meant to be
+    subclassed. FadingView doesn't overide the arcade.View on_draw method,
+    meaning that it won't be visible on its own. Additionally, alpha's
+    existence doesn't change the transparency of objects on the screen; it
+    must be used in the on_draw methods of subclasses to control transparency.
+
+    Attributes:
+        Attributes in addition to those of arcade.View.
+        :alpha: (int) Int to represent transparency of objects onscreen. 255
+            is opaque and 0 is invisible.
+        :fade_rate: (int) Amount to add or subtract from alpha each time
+            fade_in or fade_out is called.
+    """
+
     def __init__(self, fade_rate: int, alpha: int):
+        """
+        Constructor. Creates a FadingView object with given fade_rate and
+        alpha.
+
+        :param int fade_rate: Int to represent transparency of objects
+            onscreen. 255 is opaque and 0 is invisible.
+        :param int alpha: Amount to add or subtract from alpha each time
+            fade_in or fade_out is called.
+        """
 
         # Validate parameters
         if not isinstance(fade_rate, int):
@@ -3138,6 +3429,14 @@ class FadingView(arcade.View):
         self.fade_rate = fade_rate
 
     def fade_in(self) -> bool:
+        """
+        Adds fade_rate to current alpha, maxing out when alpha is 255.
+        Returns True when alpha equals 255, returns False otherwise. When
+        called repeatedly, as from an update or on_update method, can be
+        used to fade in objects from invisible to fully opaque.
+
+        :return bool: True if alpha is 255, False otherwise.
+        """
 
         # Since alpha is an attribute I created, it's okay for self.alpha to
         # rise above 255 as long as it's corrected down before it's used to
@@ -3150,9 +3449,17 @@ class FadingView(arcade.View):
             return False
 
     def fade_out(self) -> bool:
+        """
+        Subtracts fade_rate from current alpha, stopping when alpha is 0.
+        Returns True when alpha equals 0, returns False otherwise. When
+        called repeatedly, as from an update or on_update method, can be
+        used to fade out objects from fully opaque to invisible.
+
+        :return bool: True if alpha is 0, False otherwise.
+        """
 
         # It's okay for self.alpha to dip below 0 as long as it's corrected
-        # before it's used to draw
+        # before it's used to draw, since draw() methods require an alpha >= 0
         self.alpha -= self.fade_rate
         if self.alpha <= 0:
             self.alpha = 0
@@ -3161,6 +3468,11 @@ class FadingView(arcade.View):
             return False
 
     def __str__(self) -> str:
+        """
+        Returns string representation of FadingView object.
+
+        :return str: String representation of FadingView object.
+        """
         return ("<FadingView: window_width = {}, window_height = {},"
                 " alpha = {}, fade_rate = {}>".format(self.window.width,
                                                       self.window.height,
@@ -3170,20 +3482,30 @@ class FadingView(arcade.View):
 
 class TitleView(FadingView):
     def __init__(self):
+
         super().__init__(5, 0)
 
-        arcade.set_background_color((0, 0, 0))
+        # Set text and settings (these come from TextView)
+        self.main_text = "Spin\n&\nShoot"
+        self.main_text_scale_denominator = 10
+        self.main_text_size = (self.window.height
+                               / self.main_text_scale_denominator)
+        self.main_text_anchor_y = "center"
 
-        self.title_text = "Spin\n&\nShoot"
+        # Set secondary_text to empty string since TextView has text in it
+        self.secondary_text = ""
 
+        # Attributes to facilitate fading in, pausing and fading out
         self.faded_in = False
         self.pause_count = 60
         self.faded_out = False
 
-        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
-        self.bg_points = ((0, 0), (self.window.width, 0),
-                          (self.window.width, self.window.height),
-                          (0, self.window.height))
+        # Colors. Alpha is the transparency of the color
+        self.main_text_color = (255, 255, 255, self.alpha)
+        self.bottom_left_color = (0, 0, 0, self.alpha)
+        self.bottom_right_color = (0, 0, 0, self.alpha)
+        self.top_right_color = (0, 0, 0, self.alpha)
+        self.top_left_color = (0, 0, 205, self.alpha)    # Blue
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
 
@@ -3193,60 +3515,33 @@ class TitleView(FadingView):
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
+        # Update self.alpha to fade in and out
+
+        # After fading out, create and show an InstructionsView object
         if self.faded_out:
             instructions = InstructionsView()
             self.window.show_view(instructions)
+
+        # Fade in until faded_in is True to indicate fully opaque
         if not self.faded_in:
             self.faded_in = self.fade_in()
+
+        # After pausing (after fading in), fade out
         elif self.pause_count == 0:
             self.faded_out = self.fade_out()
+
+        # Pause after fading in
+        # Count down updates after being fully faded in before starting to
+        # fade out
         else:
             self.pause_count -= 1
 
-    def on_draw(self) -> None:
-        arcade.start_render()
-
-        # Draw a rectangle with different colors fading in from each corner
-        # Learned from arcade example gradients.py, accessible in the
-        # downloaded arcade package or online at (https://api.arcade.academy/
-        # en/latest/examples/gradients.html#gradients)
-        black = (0, 0, 0, self.alpha)
-        blue = (0, 0, 205, self.alpha)
-        self.bg_colors = (black, black, black, blue)
-        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
-                                                                self.bg_colors)
-
-        background.draw()
-
-        arcade.draw_text(self.title_text, self.window.width / 2,
-                         self.window.height / 2, (255, 255, 255, self.alpha),
-                         anchor_x="center", anchor_y="center",
-
-                         # Scale font size with window height (less worried
-                         # about window width since text wraps)
-                         font_size=self.window.height / 10,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-
-    def on_key_press(self, symbol: int, modifiers: int) -> None:
-
-        # Validate parameters
-        if not isinstance(symbol, int):
-            raise TypeError("TypeError: symbol must be an integer")
-        if not isinstance(modifiers, int):
-            raise TypeError("TypeError: modifiers must be an integer")
-
-        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-
-            # The asterisk unpacks the tuple so it's like I'm passing it 14
-            # different arguments
-            game = GameView(*self.window.game_parameters)
-            self.window.show_view(game)
-
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
+        # Update color transparency with alpha
+        self.main_text_color = (255, 255, 255, self.alpha)
+        self.bottom_left_color = (0, 0, 0, self.alpha)
+        self.bottom_right_color = (0, 0, 0, self.alpha)
+        self.top_right_color = (0, 0, 0, self.alpha)
+        self.top_left_color = (0, 0, 205, self.alpha)
 
     def __str__(self) -> str:
         return ("<TitleView: faded_in = {}, pause_count = {}, faded_out = {},"
@@ -3259,11 +3554,11 @@ class TitleView(FadingView):
 
 class InstructionsView(FadingView):
     def __init__(self):
+
         super().__init__(5, 0)
 
-        arcade.set_background_color((0, 0, 0))
-
-        self.title_text = ("INSTRUCTIONS:"
+        # Set text and settings
+        self.main_text = ("INSTRUCTIONS:"
                            "\n\n\nShoot the asteroids and enemies without"
                            " getting shot"
                            "\n\n\nMove forward and backward with up and down "
@@ -3274,13 +3569,23 @@ class InstructionsView(FadingView):
                            "\n\nRestart with 'cmd + r' or 'ctrl + r'"
                            "\n\nExit with 'cmd + w' or 'ctrl + w'"
                            "\n\n\nPress space to start")
+        self.main_text_scale_denominator = 40
+        self.main_text_size = (self.window.height
+                               / self.main_text_scale_denominator)
+        self.main_text_anchor_y = "center"
 
+        # Set secondary_text to empty string since TextView has text in it
+        self.secondary_text = ""
+
+        # Attribute to facilitate fading in, pausing and fading out
         self.faded_in = False
 
-        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
-        self.bg_points = ((0, 0), (self.window.width, 0),
-                          (self.window.width, self.window.height),
-                          (0, self.window.height))
+        # Colors. Alpha is the transparency of the color
+        self.main_text_color = (255, 255, 255, self.alpha)
+        self.bottom_left_color = (0, 0, 0, self.alpha)
+        self.bottom_right_color = (65, 44, 129, self.alpha)    # Purple
+        self.top_right_color = (0, 0, 0, self.alpha)
+        self.top_left_color = (0, 0, 205, self.alpha)    # Blue
 
     def on_update(self, delta_time: float = 1 / 60) -> None:
 
@@ -3290,29 +3595,16 @@ class InstructionsView(FadingView):
         if delta_time < 0:
             raise ValueError("ValueError: delta_time must be non-negative")
 
+        # Fade in until faded_in is True to indicate fully opaque
         if not self.faded_in:
             self.faded_in = self.fade_in()
 
-    def on_draw(self) -> None:
-        arcade.start_render()
-
-        purple = (65, 44, 129, self.alpha)
-        black = (0, 0, 0, self.alpha)
-        blue = (0, 0, 205, self.alpha)
-        self.bg_colors = (black, purple, black, blue)
-        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
-                                                                self.bg_colors)
-
-        background.draw()
-
-        arcade.draw_text(self.title_text, self.window.width / 2,
-                         self.window.height / 2, (255, 255, 255, self.alpha),
-                         anchor_x="center", anchor_y="center",
-
-                         # Scale font size with window height
-                         font_size=self.window.height / 40,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
+        # Update color transparency with alpha
+        self.main_text_color = (255, 255, 255, self.alpha)
+        self.bottom_left_color = (0, 0, 0, self.alpha)
+        self.bottom_right_color = (65, 44, 129, self.alpha)
+        self.top_right_color = (0, 0, 0, self.alpha)
+        self.top_left_color = (0, 0, 205, self.alpha)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
 
@@ -3322,18 +3614,12 @@ class InstructionsView(FadingView):
         if not isinstance(modifiers, int):
             raise TypeError("TypeError: modifiers must be an integer")
 
+        # Call TextView's on_key_press since it comes first
+        super().on_key_press(symbol, modifiers)
+
         if symbol == arcade.key.SPACE:
             game = GameView(*self.window.game_parameters)
             self.window.show_view(game)
-
-        elif symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                         or modifiers == arcade.key.MOD_CTRL):
-            game = GameView(*self.window.game_parameters)
-            self.window.show_view(game)
-
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
 
     def __str__(self) -> str:
         return ("<InstructionsView: faded_in = {}, alpha = {}, "
@@ -3341,156 +3627,59 @@ class InstructionsView(FadingView):
                                          self.fade_rate))
 
 
-class GameLostView(arcade.View):
-    def __init__(self):
-        super().__init__()
+class GameLostView(TextView):
+    """
+    Extends TextView. Doesn't create new attributes or methods, but assigns
+    specific values to TextView attributes so GameLostView objects can be
+    instantiated easily, without having to change many values of TextView upon
+    each instantiation.
+    """
 
-        arcade.set_background_color((0, 0, 0))
-
-        self.game_over_text = "Game Over"
-        self.instruction_text = ("\n\nRestart with 'cmd + r' or 'ctrl + r'"
-                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
-
-        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
-        self.bg_points = ((0, 0), (self.window.width, 0),
-                          (self.window.width, self.window.height),
-                          (0, self.window.height))
-
-    def on_draw(self) -> None:
-        arcade.start_render()
-
-        red = (128, 0, 0)
-        black = (0, 0, 0)
-        blue = (0, 0, 205)
-        self.bg_colors = (black, red, black, blue)
-        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
-                                                                self.bg_colors)
-
-        background.draw()
-
-        arcade.draw_text(self.game_over_text, self.window.width / 2,
-                         self.window.height / 2, (255, 255, 255),
-                         anchor_x="center", anchor_y="bottom",
-                         font_size=self.window.height / 12,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-        arcade.draw_text(self.instruction_text, self.window.width / 2,
-                         self.window.width / 4, (255, 255, 255),
-                         anchor_x="center", anchor_y="baseline",
-                         font_size=self.window.height / 40,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-
-    def on_key_press(self, symbol: int, modifiers: int) -> None:
-
-        # Validate parameters
-        if not isinstance(symbol, int):
-            raise TypeError("TypeError: symbol must be an integer")
-        if not isinstance(modifiers, int):
-            raise TypeError("TypeError: modifiers must be an integer")
-
-        # Gracefully quit program
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
-
-        # Restart program
-        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            game = GameView(*self.window.game_parameters)
-            self.window.show_view(game)
-
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
-
-    def __str__(self) -> str:
-        return "<GameLostView>"
-
-
-class GameWonView(arcade.View):
     def __init__(self, player: pyglet.media.player.Player = None,
                  sound: arcade.Sound = None):
+        super().__init__(player, sound)
 
-        # Validate parameters
-        if not isinstance(player, pyglet.media.player.Player):
-            raise TypeError("TypeError: player must be a "
-                            "pyglet.media.player.Player")
-        if not isinstance(sound, arcade.Sound):
-            raise TypeError("TypeError: sound must be an arcade.Sound")
+        # Change specifics of text
+        self.main_text = "Game Over"
 
-        super().__init__()
-
-        arcade.set_background_color((0, 0, 0))
-
-        self.game_won_text = "You won!"
-        self.instruction_text = ("\n\nRestart with 'cmd + r' or 'ctrl + r'"
-                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
-
-        self.bg_colors = ((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0))
-        self.bg_points = ((0, 0), (self.window.width, 0),
-                          (self.window.width, self.window.height),
-                          (0, self.window.height))
-
-        self.sound_player = player
-        self.sound = sound
-
-    def on_draw(self) -> None:
-        arcade.start_render()
-
-        red = (180, 100, 240)
-        black = (0, 0, 0)
-        blue = (0, 0, 205)
-        self.bg_colors = (black, blue, black, red)
-        background = arcade.create_rectangle_filled_with_colors(self.bg_points,
-                                                                self.bg_colors)
-
-        background.draw()
-
-        arcade.draw_text(self.game_won_text, self.window.width / 2,
-                         self.window.height / 2, (255, 255, 255),
-                         anchor_x="center", anchor_y="bottom",
-                         font_size=self.window.height / 12,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-        arcade.draw_text(self.instruction_text, self.window.width / 2,
-                         self.window.width / 4, (255, 255, 255),
-                         anchor_x="center", anchor_y="baseline",
-                         font_size=self.window.height / 40,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-
-    def on_key_press(self, symbol: int, modifiers: int) -> None:
-
-        # Validate parameters
-        if not isinstance(symbol, int):
-            raise TypeError("TypeError: symbol must be an integer")
-        if not isinstance(modifiers, int):
-            raise TypeError("TypeError: modifiers must be an integer")
-
-        # Gracefully quit program
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
-
-        # Restart program
-        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            if self.sound_player and self.sound.is_playing(self.sound_player):
-                self.sound.stop(self.sound_player)
-            game = GameView(*self.window.game_parameters)
-            self.window.show_view(game)
-
-    def __str__(self) -> str:
-        return "<GameWonView>"
+        # Change background colors
+        self.bottom_left_color = (0, 0, 0)
+        self.bottom_right_color = (128, 0, 0)    # Red
+        self.top_right_color = (0, 0, 0)
+        self.top_left_color = (0, 0, 205)    # Blue
+        self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
+                          self.top_right_color, self.top_left_color)
 
 
-class PauseView(arcade.View):
+class GameWonView(TextView):
+    """
+    Extends TextView. Doesn't create new attributes or methods, but assigns
+    specific values to TextView attributes so GameWonView objects can be
+    instantiated easily, without caller having to change many values of
+    TextView upon each instantiation.
+    """
+
+    def __init__(self, player: pyglet.media.player.Player = None,
+                 sound: arcade.Sound = None):
+        super().__init__(player, sound)
+
+        # Change specifics of text
+        self.main_text = "You won!"
+
+        # Change background colors
+        self.bottom_left_color = (0, 0, 0)
+        self.bottom_right_color = (0, 0, 205)    # Blue
+        self.top_right_color = (0, 0, 0)
+        self.top_left_color = (180, 100, 240)   # Pink
+        self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
+                          self.top_right_color, self.top_left_color)
+
+
+class PauseView(TextView):
+
     def __init__(self, game_view: GameView):
-
         if not isinstance(game_view, GameView):
             raise TypeError("game_view must be an instance of GameView")
-
         super().__init__()
 
         self.game_view = game_view
@@ -3505,14 +3694,23 @@ class PauseView(arcade.View):
                 self.game_view.background_music_sound.stop(
                     self.game_view.background_music_player)
 
-        arcade.set_background_color((0, 0, 0))
-        self.faded_look = (255, 255, 255, 100)
+        # This doesn't pause sound effects like leveling up, dying, or
+        # explosions
 
-        self.pause_text = "Paused"
-        self.instruction_text = ("\n\nResume play with 'cmd + t' or 'ctrl + t'"
-                                 "\n\nRestart with 'cmd + r' or 'ctrl + r'"
-                                 "\n\nExit with 'cmd + w' or 'ctrl + w'")
+        self.main_text = "Paused"
+        self.secondary_text = ("\n\nResume play with 'cmd + t' or 'ctrl + t'"
+                               + self.secondary_text)
 
+        # Transparent white color to fill rectangle with for pause screen
+        # frozen-behind-veil visual effect
+        self.bottom_left_color = (255, 255, 255, 100)
+        self.bottom_right_color = (255, 255, 255, 100)
+        self.top_right_color = (255, 255, 255, 100)
+        self.top_left_color = (255, 255, 255, 100)
+        self.bg_colors = (self.bottom_left_color, self.bottom_right_color,
+                          self.top_right_color, self.top_left_color)
+
+        # Sprite lists to draw
         self.player_list = game_view.player_list
         self.asteroid_list = game_view.asteroid_list
         self.enemy_list = game_view.enemy_list
@@ -3520,8 +3718,12 @@ class PauseView(arcade.View):
         self.enemy_lasers = game_view.enemy_laser_list
 
     def on_draw(self) -> None:
+        # TextView doesn't have start_render in its on_draw method, so this
+        # MUST be called before calling the super's on_draw
         arcade.start_render()
 
+        # Draw sprites from SpriteLists so they're visible behind transparent
+        # white rectangle
         if self.player_list:
             self.player_list.draw()
         if self.asteroid_list:
@@ -3533,44 +3735,17 @@ class PauseView(arcade.View):
         if self.enemy_lasers:
             self.enemy_lasers.draw()
 
-        arcade.draw_rectangle_filled(self.window.width / 2,
-                                     self.window.height / 2,
-                                     self.window.width, self.window.height,
-                                     self.faded_look)
-
-        arcade.draw_text(self.pause_text, self.window.width / 2,
-                         self.window.height / 2, (255, 255, 255),
-                         anchor_x="center", anchor_y="bottom",
-                         font_size=self.window.height / 12,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
-        arcade.draw_text(self.instruction_text, self.window.width / 2,
-                         self.window.width / 4, (255, 255, 255),
-                         anchor_x="center", anchor_y="baseline",
-                         font_size=self.window.height / 40,
-                         align="center", bold=True,
-                         width=self.window.width, multiline=True)
+        # Since TextView doesn't have a start_render() statement in
+        # _on_draw, can call super's _on_draw method to draw the transparent
+        # rectangle and the text
+        super()._on_draw()
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
 
-        # Validate parameters
-        if not isinstance(symbol, int):
-            raise TypeError("TypeError: symbol must be an integer")
-        if not isinstance(modifiers, int):
-            raise TypeError("TypeError: modifiers must be an integer")
+        # Use super to handle other common key presses (cmd + r and cmd + w)
+        super().on_key_press(symbol, modifiers)
 
-        # Gracefully quit program
-        if symbol == arcade.key.W and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-            arcade.close_window()
-
-        # Restart program
-        if symbol == arcade.key.R and (modifiers == arcade.key.MOD_COMMAND
-                                       or modifiers == arcade.key.MOD_CTRL):
-
-            game = GameView(*self.window.game_parameters)
-            self.window.show_view(game)
-
+        # Unpause key combination
         if symbol == arcade.key.T and (modifiers == arcade.key.MOD_COMMAND
                                        or modifiers == arcade.key.MOD_CTRL):
             # If there's music playing, restart it at the same point
