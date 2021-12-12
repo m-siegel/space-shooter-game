@@ -90,7 +90,7 @@ out Arcade.
 AtiByte:
 Before downloading and digging into the Arcade code and docs, I learned the
 basics of Arcade from some YouTube videos by AtiByte. The videos walked
-through arcade docs and demonstated how to open arcade windows, draw shapes,
+through arcade docs and demonstrated how to open arcade windows, draw shapes,
 and use keyboard input.
 - AtiByte's page:
 https://www.youtube.com/playlist?list=PL1P11yPQAo7pPlDlFEaL3IUbcWnnPcALI
@@ -1507,7 +1507,7 @@ class Explosion(arcade.Sprite):
     Utilizes arcade.Sprite's texture and textures attributes for animation.
 
     Attributes:
-        This isn't a list of all attributes that Explosion has (it has manu
+        This isn't a list of all attributes that Explosion has (it has many
         inherited ones that aren't used here. These are just the attributes
         used in this class).
         :center_x: (numeric) x-coordinate of the Explosion's center point on
@@ -2289,7 +2289,7 @@ class GameView(arcade.View):
         Appends num_asteroids number of Asteroid objects that move at speeds
         within speed_range to self.asteroid_list.
 
-        :param int num_asteroids: Number of Astroids to create.
+        :param int num_asteroids: Number of Asteroids to create.
         :param int or int tuple speed_range: Range of ints in which
             Asteroids' speeds should fall.
         :return: None
@@ -2939,7 +2939,7 @@ class GameView(arcade.View):
                 # want the ability to make it visible in the future.
                 if self.switch_delay > time_to_retreat and enemy.speed >= 0:
 
-                    # Set reverse speeds in same range as forwads speeds for
+                    # Set reverse speeds in same range as forward speeds for
                     # the level
                     enemy.set_speed_in_range(self.level_settings[
                                                  'enemy speed range'][
@@ -3703,16 +3703,16 @@ class InstructionsView(FadingView):
 
         # Instructions
         self.main_text = ("INSTRUCTIONS:"
-                           "\n\n\nShoot the asteroids and enemies without"
-                           " getting shot"
-                           "\n\n\nMove forward and backward with up and down "
-                           "arrows"
-                           "\n\nSpin left and right with left and right arrows"
-                           "\n\nShoot with the space bar"
-                           "\n\n\nPause with 'cmd + t' or 'ctrl + t'"
-                           "\n\nRestart with 'cmd + r' or 'ctrl + r'"
-                           "\n\nExit with 'cmd + w' or 'ctrl + w'"
-                           "\n\n\nPress space to start")
+                          "\n\n\nShoot the asteroids and enemies without"
+                          " getting shot"
+                          "\n\n\nMove forward and backward with up and down "
+                          "arrows"
+                          "\n\nSpin left and right with left and right arrows"
+                          "\n\nShoot with the space bar"
+                          "\n\n\nPause with 'cmd + t' or 'ctrl + t'"
+                          "\n\nRestart with 'cmd + r' or 'ctrl + r'"
+                          "\n\nExit with 'cmd + w' or 'ctrl + w'"
+                          "\n\n\nPress space to start")
 
         # Large denominator to make text relatively small and fit on screen
         self.main_text_scale_denominator = 40
