@@ -3150,7 +3150,7 @@ class TextView(arcade.View):
             left corner of the background rectangle. Defaults to black.
         :bottom_right_color: (3-tuple or 4-tuple of ints) Color of the bottom
             right corner of the background rectangle. Defaults to black.
-        :main_text_anchor_y: (int) What part of text is aligned with
+        :main_text_anchor_y: (str) What part of text is aligned with
             y-coordinate of anchor point (center, baseline, bottom, or top).
             Defaults to bottom.
         :main_text: (str) First text to draw.
@@ -3164,7 +3164,7 @@ class TextView(arcade.View):
             Defaults to 1/2 of window height.
         :secondary_text: (str) Second text to draw. Defaults to information
             about key combinations to restart the game and close the window.
-        :secondary_text_anchor_y: (int) What part of text is aligned with
+        :secondary_text_anchor_y: (str) What part of text is aligned with
             y-coordinate of anchor point (center, baseline, bottom, or top).
             Defaults to baseline.
         :secondary_text_color: (3-tuple or 4-tuple of ints) Color of
@@ -3520,7 +3520,7 @@ class TitleView(FadingView):
         :faded_out: (bool) Whether background and text have been fully faded
             out.
         :main_text: (str) Title text to draw.
-        :main_text_anchor_y: (int) What part of text is aligned with
+        :main_text_anchor_y: (str) What part of text is aligned with
             y-coordinate of anchor point. Center.
         :main_text_scale_denominator: (int) Text size is scaled to window
             height. This is what to divide window height by to get font size.
@@ -3669,7 +3669,7 @@ class InstructionsView(FadingView):
         :faded_in: (bool) Whether background and text have been fully faded
             in.
         :main_text: (str) Instructions text to draw.
-        :main_text_anchor_y: (int) What part of text is aligned with
+        :main_text_anchor_y: (str) What part of text is aligned with
             y-coordinate of anchor point. Center.
         :main_text_scale_denominator: (int) Text size is scaled to window
             height. This is what to divide window height by to get font size.
@@ -3809,10 +3809,54 @@ class GameLostView(TextView):
     specific values to TextView attributes so GameLostView objects can be
     instantiated easily, without having to change many values of TextView upon
     each instantiation.
+
+    Attributes:
+        Only main_text, bottom_right_color and top_left_color differ from
+        TextView defaults. For more information on each attribute, see
+        TextView.
+        :bg_colors: (4-tuple of color tuples) Colors of the four corners of
+            the background rectangle.
+        :bg_points: (4-tuple of 2-tuples of ints) Represents the vertices of
+            the background rectangle.
+        :bottom_left_color: (3-tuple of ints) Black (0, 0, 0).
+        :bottom_right_color: (3-tuple of ints) Red (128, 0, 0).
+        :main_text: (str) First text to draw, "Game Over."
+        :main_text_anchor_y: (str) What part of text is aligned with
+            y-coordinate of anchor point. Default; bottom.
+        :main_text_color: (3-tuple of ints) White (255, 255, 255).
+        :main_text_scale_denominator: (int) Default; 12.
+        :main_text_size: (float) Font size. Large since denominator is small.
+        :main_text_start_y: (float) Y-coordinate of text's anchor point.
+            Default; 1/2 of window height.
+        :secondary_text: (str) Default. Information about commands to close
+            the window (cmd/ctrl + w) or to restart the game (cmd/ctrl + r).
+        :secondary_text_anchor_y: (str) What part of text is aligned with
+            y-coordinate of anchor point. Default; baseline.
+        :secondary_text_color: (3-tuple of ints) Default; white (255, 255,
+            255).
+        :secondary_text_scale_denominator: (int) Default; 40.
+        :secondary_text_size: (float) Font size. Small since denominator is
+            large.
+        :secondary_text_start_y: (float) Y-coordinate of text's anchor point.
+            Default; 1/2 of window height - font size.
+        :sound: (arcade.Sound) Sound that started playing before object was
+            instantiated and should be stopped playing if game is restarted.
+        :sound_player: (pyglet.media.player.Player) Player playing the sound.
+        :top_left_color: (3-tuple of ints) Blue (0, 0, 205).
+        :top_right_color: (3-tuple of ints) Black (0, 0, 0).
+        :window: (arcade.Window) Window that this view is associated with.
     """
 
     def __init__(self, player: pyglet.media.player.Player = None,
                  sound: arcade.Sound = None):
+        """
+        Constructor. Creates GameLostView object, which is a TextView object
+        with main_text, "Game Over," a blue top left corner, and a red bottom
+        right corner.
+
+        :param pyglet.media.player.Player player: Player that's playing sound.
+        :param arcade.Sound sound: Sound that's being played
+        """
         super().__init__(player, sound)
 
         # Change specifics of text
@@ -3831,8 +3875,44 @@ class GameWonView(TextView):
     """
     Extends TextView. Doesn't create new attributes or methods, but assigns
     specific values to TextView attributes so GameWonView objects can be
-    instantiated easily, without caller having to change many values of
-    TextView upon each instantiation.
+    instantiated easily, without having to change many values of TextView upon
+    each instantiation.
+
+    Attributes:
+        Only main_text, bottom_right_color and top_left_color differ from
+        TextView defaults. For more information on each attribute, see
+        TextView.
+        :bg_colors: (4-tuple of color tuples) Colors of the four corners of
+            the background rectangle.
+        :bg_points: (4-tuple of 2-tuples of ints) Represents the vertices of
+            the background rectangle.
+        :bottom_left_color: (3-tuple of ints) Black (0, 0, 0).
+        :bottom_right_color: (3-tuple of ints) Blue (0, 0, 205).
+        :main_text: (str) First text to draw, "You won!"
+        :main_text_anchor_y: (str) What part of text is aligned with
+            y-coordinate of anchor point. Default; bottom.
+        :main_text_color: (3-tuple of ints) White (255, 255, 255).
+        :main_text_scale_denominator: (int) Default; 12.
+        :main_text_size: (float) Font size. Large since denominator is small.
+        :main_text_start_y: (float) Y-coordinate of text's anchor point.
+            Default; 1/2 of window height.
+        :secondary_text: (str) Default. Information about commands to close
+            the window (cmd/ctrl + w) or to restart the game (cmd/ctrl + r).
+        :secondary_text_anchor_y: (str) What part of text is aligned with
+            y-coordinate of anchor point. Default; baseline.
+        :secondary_text_color: (3-tuple of ints) Default; white (255, 255,
+            255).
+        :secondary_text_scale_denominator: (int) Default; 40.
+        :secondary_text_size: (float) Font size. Small since denominator is
+            large.
+        :secondary_text_start_y: (float) Y-coordinate of text's anchor point.
+            Default; 1/2 of window height - font size.
+        :sound: (arcade.Sound) Sound that started playing before object was
+            instantiated and should be stopped playing if game is restarted.
+        :sound_player: (pyglet.media.player.Player) Player playing the sound.
+        :top_left_color: (3-tuple of ints) Pink (180, 100, 240).
+        :top_right_color: (3-tuple of ints) Black (0, 0, 0).
+        :window: (arcade.Window) Window that this view is associated with.
     """
 
     def __init__(self, player: pyglet.media.player.Player = None,
@@ -3852,8 +3932,49 @@ class GameWonView(TextView):
 
 
 class PauseView(TextView):
+    """
+    Extends TextView to represent a paused screen. In a PauseView, all of
+    the active sprites from a GameView are still visible, but are frozen and
+    appear veiled behind a semi-transparent white wall. If the user presses
+    cmd/ctrl + t from a pause screen, the game resumes playing from where it
+    had been paused.
+
+    Attributes:
+        Instead of listing all attributes, including unused ones from
+        TextView, I just list the attributes that PauseView creates or
+        explicitly uses from TextView.
+        :asteroid_list: (arcade.SpriteList) Asteroids from game_view.
+        :bg_colors: (4-tuple of color tuples) Colors of the four corners of
+            the background rectangle.
+        :bottom_left_color: (int 4-tuple) Transparent white, (255, 255, 255,
+            100).
+        :bottom_right_color: (int 4-tuple) Transparent white, (255, 255, 255,
+            100).
+        :enemy_lasers: (arcade.SpriteList) EnemyShip Lasers from game_view.
+        :enemy_list: (arcade.SpriteList) EnemyShips from game_view.
+        :game_view: (GameView) The GameView that has been paused and that
+            should resume from the same place when PauseView is un-paused.
+        :main_text: (str) First text to draw, "Paused"
+        :player_lasers: (arcade.SpriteList) Player Lasers from game_view.
+        :player_list: (arcade.SpriteList) Player sprites from game_view.
+        :secondary_text: (str) Information about command to resume play
+            (cmd/ctrl + t) in addition to default info about commands to close
+            the window (cmd/ctrl + w) or to restart the game (cmd/ctrl + r).
+        :sound_time: (float) Playback time of game_view's background sound
+            when PauseView is instantiated.
+        :top_left_color: (int 4-tuple) Transparent white, (255, 255, 255,
+            100).
+        :top_right_color: (int 4-tuple) Transparent white, (255, 255, 255,
+            100).
+        :window: (arcade.Window) Window that this view is associated with.
+    """
 
     def __init__(self, game_view: GameView):
+        """
+
+        :param GameView game_view:
+        """
+
         if not isinstance(game_view, GameView):
             raise TypeError("game_view must be an instance of GameView")
         super().__init__()
